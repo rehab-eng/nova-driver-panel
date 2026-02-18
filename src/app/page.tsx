@@ -45,11 +45,34 @@ const statusStyles: Record<string, string> = {
   cancelled: "bg-rose-500/20 text-rose-200 border-rose-400/40",
 };
 
+const statusLabels: Record<string, string> = {
+  pending: "قيد الانتظار",
+  accepted: "تم القبول",
+  delivering: "قيد التوصيل",
+  delivered: "تم التسليم",
+  cancelled: "ملغي",
+};
+
+function formatStatus(value: string | null | undefined): string {
+  if (!value) return "-";
+  return statusLabels[value] ?? value;
+}
+
+const driverStatusLabels: Record<string, string> = {
+  online: "متصل",
+  offline: "غير متصل",
+};
+
+function formatDriverStatus(value: string | null | undefined): string {
+  if (!value) return "غير متصل";
+  return driverStatusLabels[value] ?? value;
+}
+
 const payoutLabels: Record<string, string> = {
-  card: "Bank Card",
-  wallet: "Local Wallet",
-  cash: "Cash",
-  bank_transfer: "Bank Transfer",
+  card: "بطاقة مصرفية",
+  wallet: "محفظة محلية",
+  cash: "نقداً",
+  bank_transfer: "حوالة مصرفية",
 };
 
 function formatPayout(value: string | null | undefined): string {
@@ -113,11 +136,11 @@ export default function DriverPanel() {
       for (const order of nextOrders) {
         const previous = prevMap.get(order.id);
         if (!previous) {
-          toast.success(`New order ${order.id.slice(0, 6)}...`);
+          toast.success(`طلب جديد ${order.id.slice(0, 6)}...`);
           flashOrder(order.id);
         } else if (previous.status !== order.status) {
-          toast(`Order ${order.id.slice(0, 6)}... is now ${order.status}`, {
-            icon: "?",
+          toast(`تم تحديث حالة الطلب إلى ${formatStatus(order.status)}`, {
+            icon: "🔔",
           });
           flashOrder(order.id);
         }
@@ -144,7 +167,7 @@ export default function DriverPanel() {
           if (!hasLoadedRef.current) hasLoadedRef.current = true;
         }
       } catch {
-        if (showToasts) toast.error("Failed to load orders");
+        if (showToasts) toast.error("تعذر تحميل الطلبات");
       }
     };
 
@@ -180,7 +203,7 @@ export default function DriverPanel() {
 
   const login = async (e: React.FormEvent) => {
     e.preventDefault();
-    const toastId = toast.loading("Signing in...");
+    const toastId = toast.loading("جاري تسجيل الدخول...");
 
     try {
       const res = await fetch(`${API_BASE}/drivers/login`, {
@@ -192,12 +215,12 @@ export default function DriverPanel() {
       const data = await res.json();
       if (data?.driver?.id) {
         setDriver(data.driver);
-        toast.success("Welcome back", { id: toastId });
+        toast.success("مرحباً بعودتك", { id: toastId });
       } else {
-        toast.error(data?.error ?? "Login failed", { id: toastId });
+        toast.error(data?.error ?? "فشل تسجيل الدخول", { id: toastId });
       }
     } catch {
-      toast.error("Network error", { id: toastId });
+      toast.error("خطأ في الشبكة", { id: toastId });
     }
   };
 
@@ -213,7 +236,7 @@ export default function DriverPanel() {
   const updateStatus = async (orderId: string, status: string) => {
     if (!driver) return;
 
-    const toastId = toast.loading("Updating status...");
+    const toastId = toast.loading("جاري تحديث الحالة...");
 
     try {
       const res = await fetch(`${API_BASE}/orders/${orderId}/status`, {
@@ -228,13 +251,13 @@ export default function DriverPanel() {
 
       const data = await res.json();
       if (data?.ok) {
-        toast.success("Status updated", { id: toastId });
+        toast.success("تم تحديث الحالة", { id: toastId });
         await refreshDriver();
       } else {
-        toast.error(data?.error ?? "Update failed", { id: toastId });
+        toast.error(data?.error ?? "فشل التحديث", { id: toastId });
       }
     } catch {
-      toast.error("Network error", { id: toastId });
+      toast.error("خطأ في الشبكة", { id: toastId });
     }
   };
 
@@ -248,26 +271,29 @@ export default function DriverPanel() {
               <Image src="/logo.png" alt="NOVA MAX" width={52} height={52} />
             </div>
             <div className="text-center">
-              <p className="text-xs uppercase tracking-[0.35em] text-slate-400">
-                Nova Max
+              <p className="text-xs tracking-[0.25em] text-slate-400">
+                نوفا ماكس
               </p>
-              <h1 className="text-2xl font-semibold">Driver Login</h1>
+              <h1 className="text-2xl font-semibold">تسجيل دخول السائق</h1>
+              <p className="mt-2 text-sm text-slate-400">
+                أدخل رقم الهاتف والكود السري من لوحة المتجر.
+              </p>
             </div>
             <form onSubmit={login} className="mt-4 grid w-full gap-3">
               <input
                 className="h-12 rounded-2xl border border-slate-800 bg-slate-950 px-4 text-sm text-slate-100 outline-none focus:border-slate-600"
-                placeholder="Phone"
+                placeholder="رقم الهاتف"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
               />
               <input
                 className="h-12 rounded-2xl border border-slate-800 bg-slate-950 px-4 text-sm text-slate-100 outline-none focus:border-slate-600"
-                placeholder="Secret Code"
+                placeholder="الكود السري"
                 value={secretCode}
                 onChange={(e) => setSecretCode(e.target.value)}
               />
               <button className="h-12 rounded-2xl bg-indigo-500 text-sm font-semibold text-white transition hover:bg-indigo-400">
-                Enter Driver Panel
+                دخول لوحة السائق
               </button>
             </form>
           </div>
@@ -286,14 +312,14 @@ export default function DriverPanel() {
               <Image src="/logo.png" alt="NOVA MAX" width={40} height={40} />
             </div>
             <div>
-              <p className="text-xs uppercase tracking-[0.3em] text-slate-400">
-                NOVA MAX
+              <p className="text-xs tracking-[0.25em] text-slate-400">
+                نوفا ماكس
               </p>
-              <p className="text-sm text-slate-200">Ready for delivery</p>
+              <p className="text-sm text-slate-200">جاهز للتوصيل</p>
             </div>
           </div>
           <div className="rounded-2xl border border-orange-400/30 bg-orange-500/10 px-4 py-3 text-right">
-            <p className="text-xs text-orange-200">Wallet Balance</p>
+            <p className="text-xs text-orange-200">رصيد المحفظة</p>
             <p className="text-2xl font-semibold text-orange-100">
               {typeof driver.wallet_balance === "number"
                 ? driver.wallet_balance.toFixed(2)
@@ -306,36 +332,36 @@ export default function DriverPanel() {
           <div className="rounded-3xl border border-slate-800 bg-slate-900/70 px-5 py-4 shadow-lg">
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div>
-                <p className="text-xs uppercase tracking-[0.3em] text-slate-400">
-                  Driver Profile
+                <p className="text-xs tracking-[0.25em] text-slate-400">
+                  بيانات السائق
                 </p>
                 <p className="mt-2 text-lg font-semibold text-slate-100">
-                  {driver.name ?? "Driver"}
+                  {driver.name ?? "السائق"}
                 </p>
               </div>
               <div className="grid w-full gap-3 sm:w-auto sm:grid-cols-3">
                 <div className="rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3">
-                  <p className="text-xs uppercase tracking-[0.2em] text-slate-500">
-                    Phone
+                  <p className="text-xs tracking-[0.2em] text-slate-500">
+                    الهاتف
                   </p>
                   <p className="mt-1 text-sm font-semibold text-slate-100">
                     {driver.phone ?? phone ?? "-"}
                   </p>
                 </div>
                 <div className="rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3">
-                  <p className="text-xs uppercase tracking-[0.2em] text-slate-500">
-                    Secret Code
+                  <p className="text-xs tracking-[0.2em] text-slate-500">
+                    الكود السري
                   </p>
                   <p className="mt-1 text-sm font-semibold text-slate-100">
                     {secretCode || "-"}
                   </p>
                 </div>
                 <div className="rounded-2xl border border-orange-400/30 bg-orange-500/10 px-4 py-3">
-                  <p className="text-xs uppercase tracking-[0.2em] text-orange-200">
-                    Status
+                  <p className="text-xs tracking-[0.2em] text-orange-200">
+                    الحالة
                   </p>
                   <p className="mt-1 text-sm font-semibold text-orange-100">
-                    {driver.status ?? "offline"}
+                    {formatDriverStatus(driver.status)}
                   </p>
                 </div>
               </div>
@@ -355,31 +381,31 @@ export default function DriverPanel() {
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <p className="text-lg font-semibold text-slate-100">
-                    {order.customer_name ?? "Customer"}
+                    {order.customer_name ?? "العميل"}
                   </p>
                   <p className="mt-1 text-sm text-slate-400">
-                    {order.customer_location_text ?? "Location not set"}
+                    {order.customer_location_text ?? "الموقع غير محدد"}
                   </p>
                   <div className="mt-3 grid gap-2 text-xs text-slate-400 sm:grid-cols-3">
                     <div className="rounded-xl border border-slate-800 bg-slate-950 px-3 py-2">
-                      <p className="uppercase tracking-[0.2em] text-[10px] text-slate-500">
-                        Recipient
+                      <p className="tracking-[0.2em] text-[10px] text-slate-500">
+                        المستلم
                       </p>
                       <p className="mt-1 text-sm text-slate-100">
                         {order.receiver_name ?? "-"}
                       </p>
                     </div>
                     <div className="rounded-xl border border-slate-800 bg-slate-950 px-3 py-2">
-                      <p className="uppercase tracking-[0.2em] text-[10px] text-slate-500">
-                        Order Type
+                      <p className="tracking-[0.2em] text-[10px] text-slate-500">
+                        نوع الطلب
                       </p>
                       <p className="mt-1 text-sm text-slate-100">
                         {order.order_type ?? "-"}
                       </p>
                     </div>
                     <div className="rounded-xl border border-orange-400/30 bg-orange-500/10 px-3 py-2">
-                      <p className="uppercase tracking-[0.2em] text-[10px] text-orange-200">
-                        Payout Method
+                      <p className="tracking-[0.2em] text-[10px] text-orange-200">
+                        طريقة الدفع
                       </p>
                       <p className="mt-1 text-sm font-semibold text-orange-100">
                         {formatPayout(order.payout_method)}
@@ -393,14 +419,14 @@ export default function DriverPanel() {
                     statusStyles[order.status ?? ""] ?? "border-slate-700 text-slate-300"
                   )}
                 >
-                  {order.status ?? "unknown"}
+                  {formatStatus(order.status)}
                 </span>
               </div>
 
               <div className="mt-4 flex items-center justify-between rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm">
                 <div>
-                  <p className="text-xs uppercase tracking-[0.2em] text-slate-500">
-                    Delivery Fee
+                  <p className="text-xs tracking-[0.2em] text-slate-500">
+                    رسوم التوصيل
                   </p>
                   <p className="mt-1 text-base font-semibold text-slate-100">
                     {typeof order.delivery_fee === "number"
@@ -409,8 +435,8 @@ export default function DriverPanel() {
                   </p>
                 </div>
                 <div className="text-right">
-                  <p className="text-xs uppercase tracking-[0.2em] text-slate-500">
-                    Order
+                  <p className="text-xs tracking-[0.2em] text-slate-500">
+                    الطلب
                   </p>
                   <p className="mt-1 text-base font-semibold text-slate-100">
                     {order.id.slice(0, 6)}...
@@ -425,7 +451,7 @@ export default function DriverPanel() {
                     onClick={() => updateStatus(order.id, "accepted")}
                   >
                     <CheckCircleIcon className="h-5 w-5" />
-                    Accept Order
+                    قبول الطلب
                   </button>
                 )}
                 {order.status === "accepted" && (
@@ -434,7 +460,7 @@ export default function DriverPanel() {
                     onClick={() => updateStatus(order.id, "delivering")}
                   >
                     <TruckIcon className="h-5 w-5" />
-                    Start Delivery
+                    بدء التوصيل
                   </button>
                 )}
                 {order.status === "delivering" && (
@@ -443,7 +469,7 @@ export default function DriverPanel() {
                     onClick={() => updateStatus(order.id, "delivered")}
                   >
                     <BoltIcon className="h-5 w-5" />
-                    Mark Delivered
+                    تم التسليم
                   </button>
                 )}
                 {order.status !== "delivered" && order.status !== "cancelled" && (
@@ -452,7 +478,7 @@ export default function DriverPanel() {
                     onClick={() => updateStatus(order.id, "cancelled")}
                   >
                     <XCircleIcon className="h-5 w-5" />
-                    Cancel Order
+                    إلغاء الطلب
                   </button>
                 )}
               </div>
@@ -461,7 +487,7 @@ export default function DriverPanel() {
 
           {orders.length === 0 && (
             <div className="rounded-3xl border border-slate-800 bg-slate-900/70 px-6 py-8 text-center text-sm text-slate-400">
-              No assigned orders yet.
+              لا توجد طلبات مخصصة بعد.
             </div>
           )}
         </section>
