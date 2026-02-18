@@ -38,7 +38,7 @@ const statusStyles: Record<string, string> = {
   pending: "bg-amber-500/20 text-amber-200 border-amber-400/40",
   accepted: "bg-sky-500/20 text-sky-200 border-sky-400/40",
   delivering: "bg-indigo-500/20 text-indigo-200 border-indigo-400/40",
-  delivered: "bg-emerald-500/20 text-emerald-200 border-emerald-400/40",
+  delivered: "bg-orange-500/20 text-orange-200 border-orange-400/40",
   cancelled: "bg-rose-500/20 text-rose-200 border-rose-400/40",
 };
 
@@ -277,9 +277,9 @@ export default function DriverPanel() {
               <p className="text-sm text-slate-200">Ready for delivery</p>
             </div>
           </div>
-          <div className="rounded-2xl border border-emerald-400/30 bg-emerald-500/10 px-4 py-3 text-right">
-            <p className="text-xs text-emerald-200">Wallet Balance</p>
-            <p className="text-2xl font-semibold text-emerald-100">
+          <div className="rounded-2xl border border-orange-400/30 bg-orange-500/10 px-4 py-3 text-right">
+            <p className="text-xs text-orange-200">Wallet Balance</p>
+            <p className="text-2xl font-semibold text-orange-100">
               {typeof driver.wallet_balance === "number"
                 ? driver.wallet_balance.toFixed(2)
                 : "0.00"}
@@ -357,7 +357,7 @@ export default function DriverPanel() {
                 )}
                 {order.status === "delivering" && (
                   <button
-                    className="flex h-12 items-center justify-center gap-2 rounded-2xl bg-emerald-500 text-sm font-semibold text-white transition hover:bg-emerald-400"
+                    className="flex h-12 items-center justify-center gap-2 rounded-2xl bg-orange-500 text-sm font-semibold text-white transition hover:bg-orange-400"
                     onClick={() => updateStatus(order.id, "delivered")}
                   >
                     <BoltIcon className="h-5 w-5" />
