@@ -29,6 +29,9 @@ type Order = {
   id: string;
   customer_name: string | null;
   customer_location_text: string | null;
+  order_type: string | null;
+  receiver_name: string | null;
+  payout_method: string | null;
   price: number | null;
   delivery_fee: number | null;
   status: string | null;
@@ -41,6 +44,18 @@ const statusStyles: Record<string, string> = {
   delivered: "bg-orange-500/20 text-orange-200 border-orange-400/40",
   cancelled: "bg-rose-500/20 text-rose-200 border-rose-400/40",
 };
+
+const payoutLabels: Record<string, string> = {
+  card: "Bank Card",
+  wallet: "Local Wallet",
+  cash: "Cash",
+  bank_transfer: "Bank Transfer",
+};
+
+function formatPayout(value: string | null | undefined): string {
+  if (!value) return "-";
+  return payoutLabels[value] ?? value;
+}
 
 export default function DriverPanel() {
   const [phone, setPhone] = useState("");
@@ -288,6 +303,47 @@ export default function DriverPanel() {
         </header>
 
         <section className="mt-6 grid gap-4">
+          <div className="rounded-3xl border border-slate-800 bg-slate-900/70 px-5 py-4 shadow-lg">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div>
+                <p className="text-xs uppercase tracking-[0.3em] text-slate-400">
+                  Driver Profile
+                </p>
+                <p className="mt-2 text-lg font-semibold text-slate-100">
+                  {driver.name ?? "Driver"}
+                </p>
+              </div>
+              <div className="grid w-full gap-3 sm:w-auto sm:grid-cols-3">
+                <div className="rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3">
+                  <p className="text-xs uppercase tracking-[0.2em] text-slate-500">
+                    Phone
+                  </p>
+                  <p className="mt-1 text-sm font-semibold text-slate-100">
+                    {driver.phone ?? phone ?? "-"}
+                  </p>
+                </div>
+                <div className="rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3">
+                  <p className="text-xs uppercase tracking-[0.2em] text-slate-500">
+                    Secret Code
+                  </p>
+                  <p className="mt-1 text-sm font-semibold text-slate-100">
+                    {secretCode || "-"}
+                  </p>
+                </div>
+                <div className="rounded-2xl border border-orange-400/30 bg-orange-500/10 px-4 py-3">
+                  <p className="text-xs uppercase tracking-[0.2em] text-orange-200">
+                    Status
+                  </p>
+                  <p className="mt-1 text-sm font-semibold text-orange-100">
+                    {driver.status ?? "offline"}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-6 grid gap-4">
           {orders.map((order) => (
             <div
               key={order.id}
@@ -304,6 +360,32 @@ export default function DriverPanel() {
                   <p className="mt-1 text-sm text-slate-400">
                     {order.customer_location_text ?? "Location not set"}
                   </p>
+                  <div className="mt-3 grid gap-2 text-xs text-slate-400 sm:grid-cols-3">
+                    <div className="rounded-xl border border-slate-800 bg-slate-950 px-3 py-2">
+                      <p className="uppercase tracking-[0.2em] text-[10px] text-slate-500">
+                        Recipient
+                      </p>
+                      <p className="mt-1 text-sm text-slate-100">
+                        {order.receiver_name ?? "-"}
+                      </p>
+                    </div>
+                    <div className="rounded-xl border border-slate-800 bg-slate-950 px-3 py-2">
+                      <p className="uppercase tracking-[0.2em] text-[10px] text-slate-500">
+                        Order Type
+                      </p>
+                      <p className="mt-1 text-sm text-slate-100">
+                        {order.order_type ?? "-"}
+                      </p>
+                    </div>
+                    <div className="rounded-xl border border-orange-400/30 bg-orange-500/10 px-3 py-2">
+                      <p className="uppercase tracking-[0.2em] text-[10px] text-orange-200">
+                        Payout Method
+                      </p>
+                      <p className="mt-1 text-sm font-semibold text-orange-100">
+                        {formatPayout(order.payout_method)}
+                      </p>
+                    </div>
+                  </div>
                 </div>
                 <span
                   className={cn(
