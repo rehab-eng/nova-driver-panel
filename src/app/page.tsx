@@ -21,6 +21,7 @@ type Driver = {
   id: string;
   name: string | null;
   phone: string | null;
+  email: string | null;
   status: string | null;
   wallet_balance: number | null;
   photo_url: string | null;
@@ -28,6 +29,7 @@ type Driver = {
 
 type Order = {
   id: string;
+  driver_id?: string | null;
   customer_name: string | null;
   customer_location_text: string | null;
   order_type: string | null;
@@ -97,8 +99,17 @@ function formatTxType(value: string | null | undefined): string {
   return value;
 }
 
+function buildWsUrl(path: string, params: Record<string, string>): string {
+  const url = new URL(API_BASE);
+  url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
+  url.pathname = path;
+  Object.entries(params).forEach(([key, value]) => url.searchParams.set(key, value));
+  return url.toString();
+}
+
 export default function DriverPanel() {
   const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
   const [secretCode, setSecretCode] = useState("");
   const [driver, setDriver] = useState<Driver | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
@@ -113,21 +124,31 @@ export default function DriverPanel() {
   useEffect(() => {
     const storedDriver = localStorage.getItem("nova.driver");
     const storedCode = localStorage.getItem("nova.driver_code");
+    const storedEmail = localStorage.getItem("nova.driver_email");
     if (storedDriver) setDriver(JSON.parse(storedDriver));
     if (storedCode) setSecretCode(storedCode);
+    if (storedEmail) setEmail(storedEmail);
   }, []);
 
   useEffect(() => {
     if (driver) localStorage.setItem("nova.driver", JSON.stringify(driver));
-  }, [driver]);
+  }, [driver, secretCode]);
 
   useEffect(() => {
     setPhotoUrl(driver?.photo_url ?? "");
   }, [driver]);
 
   useEffect(() => {
+    if (driver?.email) setEmail(driver.email);
+  }, [driver]);
+
+  useEffect(() => {
     localStorage.setItem("nova.driver_code", secretCode);
   }, [secretCode]);
+
+  useEffect(() => {
+    localStorage.setItem("nova.driver_email", email);
+  }, [email]);
 
   const flashOrder = (id: string) => {
     setFlashIds((prev) => {
@@ -178,6 +199,10 @@ export default function DriverPanel() {
     if (!driver) return;
     let active = true;
     let source: EventSource | null = null;
+    let socket: WebSocket | null = null;
+    let pingTimer: number | null = null;
+    let reconnectTimer: number | null = null;
+    let retry = 0;
 
     const fetchOrders = async (showToasts: boolean) => {
       try {
@@ -192,6 +217,111 @@ export default function DriverPanel() {
       } catch {
         if (showToasts) toast.error("تعذر تحميل الطلبات");
       }
+    };
+
+    const upsertOrder = (
+      incoming: Partial<Order> & { id: string },
+      showToasts = true
+    ) => {
+      const current = ordersRef.current;
+      const idx = current.findIndex((order) => order.id === incoming.id);
+      let next: Order[];
+      if (idx >= 0) {
+        next = [...current];
+        next[idx] = { ...next[idx], ...incoming };
+      } else {
+        next = [incoming as Order, ...current];
+      }
+      const shouldToast = showToasts && hasLoadedRef.current;
+      applyOrders(next, shouldToast);
+      if (!hasLoadedRef.current) hasLoadedRef.current = true;
+    };
+
+    const handleRealtime = (payload: Record<string, unknown>) => {
+      const type = payload.type;
+      if (type === "order_created" && payload.order && typeof payload.order === "object") {
+        const order = payload.order as Order;
+        if (order.driver_id && order.driver_id !== driver.id) return;
+        upsertOrder(order);
+        return;
+      }
+      if (type === "order_status" && typeof payload.order_id === "string") {
+        upsertOrder(
+          {
+            id: payload.order_id,
+            status: typeof payload.status === "string" ? payload.status : null,
+            driver_id:
+              typeof payload.driver_id === "string" ? payload.driver_id : null,
+          },
+          true
+        );
+        return;
+      }
+      if (type === "wallet_transaction" && typeof payload.driver_id === "string") {
+        if (payload.driver_id !== driver.id) return;
+        const balance =
+          typeof payload.balance === "number" ? payload.balance : null;
+        if (balance !== null) {
+          setDriver((prev) => (prev ? { ...prev, wallet_balance: balance } : prev));
+        }
+        if (payload.transaction && typeof payload.transaction === "object") {
+          const tx = payload.transaction as WalletTx;
+          setTransactions((prev) => [tx, ...prev].slice(0, 6));
+        }
+        return;
+      }
+      if (type === "driver_status" && typeof payload.driver_id === "string") {
+        if (payload.driver_id !== driver.id) return;
+        const nextStatus =
+          typeof payload.status === "string" ? payload.status : null;
+        if (nextStatus) {
+          setDriver((prev) => (prev ? { ...prev, status: nextStatus } : prev));
+        }
+      }
+    };
+
+    const startSocket = () => {
+      const driverEmail = driver.email ?? email;
+      if (!driverEmail) return;
+      const wsUrl = buildWsUrl("/realtime", {
+        role: "driver",
+        driver_id: driver.id,
+        secret_code: secretCode,
+        email: driverEmail,
+      });
+      socket = new WebSocket(wsUrl);
+
+      socket.onopen = () => {
+        retry = 0;
+        if (pingTimer) window.clearInterval(pingTimer);
+        pingTimer = window.setInterval(() => {
+          if (socket?.readyState === WebSocket.OPEN) {
+            socket.send(JSON.stringify({ type: "ping" }));
+          }
+        }, 25000);
+      };
+
+      socket.onmessage = (event) => {
+        if (!active) return;
+        try {
+          const payload = JSON.parse(event.data) as Record<string, unknown>;
+          handleRealtime(payload);
+        } catch {
+          // ignore
+        }
+      };
+
+      socket.onerror = () => {
+        socket?.close();
+      };
+
+      socket.onclose = () => {
+        if (pingTimer) window.clearInterval(pingTimer);
+        if (!active) return;
+        const delay = Math.min(30000, 1000 * 2 ** retry);
+        retry += 1;
+        reconnectTimer = window.setTimeout(startSocket, delay);
+      };
     };
 
     const startSSE = () => {
@@ -210,16 +340,21 @@ export default function DriverPanel() {
       };
     };
 
-    startSSE();
+    startSocket();
     fetchOrders(false);
 
     const poll = window.setInterval(() => {
-      if (!source) fetchOrders(true);
-    }, 4000);
+      if (!socket || socket.readyState !== WebSocket.OPEN) {
+        fetchOrders(true);
+      }
+    }, 6000);
 
     return () => {
       active = false;
       source?.close();
+      socket?.close();
+      if (pingTimer) window.clearInterval(pingTimer);
+      if (reconnectTimer) window.clearTimeout(reconnectTimer);
       window.clearInterval(poll);
     };
   }, [driver]);
@@ -231,13 +366,17 @@ export default function DriverPanel() {
 
   const login = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!email.trim()) {
+      toast.error("البريد الإلكتروني مطلوب");
+      return;
+    }
     const toastId = toast.loading("جاري تسجيل الدخول...");
 
     try {
       const res = await fetch(`${API_BASE}/drivers/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone, secret_code: secretCode }),
+        body: JSON.stringify({ phone, email, secret_code: secretCode }),
       });
 
       const data = await res.json();
@@ -392,6 +531,12 @@ export default function DriverPanel() {
               />
               <input
                 className="h-14 rounded-2xl border border-slate-800 bg-slate-950 px-4 text-base text-slate-100 outline-none focus:border-orange-400/70"
+                placeholder="البريد الإلكتروني"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+              <input
+                className="h-14 rounded-2xl border border-slate-800 bg-slate-950 px-4 text-base text-slate-100 outline-none focus:border-orange-400/70"
                 placeholder="الكود السري"
                 value={secretCode}
                 onChange={(e) => setSecretCode(e.target.value)}
@@ -451,6 +596,12 @@ export default function DriverPanel() {
               <p className="text-xs tracking-[0.2em] text-slate-500">الهاتف</p>
               <p className="mt-1 text-sm font-semibold text-slate-100">
                 {driver.phone ?? phone ?? "-"}
+              </p>
+            </div>
+            <div className="rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3">
+              <p className="text-xs tracking-[0.2em] text-slate-500">البريد الإلكتروني</p>
+              <p className="mt-1 text-sm font-semibold text-slate-100">
+                {driver.email ?? email ?? "-"}
               </p>
             </div>
             <div className="rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3">
