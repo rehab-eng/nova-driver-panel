@@ -8,11 +8,15 @@ import { twMerge } from "tailwind-merge";
 import {
   Bars3Icon,
   BoltIcon,
+  BellIcon,
   CheckCircleIcon,
+  ClipboardDocumentListIcon,
   Cog6ToothIcon,
+  HomeIcon,
   LifebuoyIcon,
   ArrowRightOnRectangleIcon,
   TruckIcon,
+  WalletIcon,
   XCircleIcon,
   XMarkIcon,
 } from "@heroicons/react/24/outline";
@@ -666,10 +670,19 @@ export default function DriverPanel() {
           </div>
         </div>
       )}
-      <div className="mx-auto flex min-h-screen w-full max-w-md flex-col px-4 py-6">
+      <div className="mx-auto flex min-h-screen w-full max-w-md flex-col px-4 py-6 pb-24">
         <header className="rounded-[28px] border border-white/60 bg-white/70 p-4 text-right shadow-[0_20px_50px_-30px_rgba(0,0,0,0.8)] backdrop-blur-xl">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">\n              <button\n                type="button"\n                onClick={() => setMenuOpen(true)}\n                className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/60 bg-white/70 text-slate-700"\n                aria-label="??? ???????"\n              >\n                <Bars3Icon className="h-5 w-5" />\n              </button>\n              <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-2xl bg-white">
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setMenuOpen(true)}
+                className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/60 bg-white/70 text-slate-700"
+                aria-label="فتح القائمة"
+              >
+                <Bars3Icon className="h-5 w-5" />
+              </button>
+              <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-2xl bg-white">
               <img
                 src={driver.photo_url ?? "/logo.png"}
                 alt="NOVA MAX"
@@ -928,8 +941,46 @@ export default function DriverPanel() {
           )}
         </section>
       </div>
+      <nav className="fixed bottom-4 left-1/2 z-40 w-[calc(100%-2rem)] max-w-md -translate-x-1/2 rounded-[24px] border border-white/60 bg-white/80 px-4 py-3 shadow-[0_16px_40px_-20px_rgba(0,0,0,0.25)] backdrop-blur-2xl">
+        <div className="grid grid-cols-4 gap-3 text-xs text-slate-700">
+          <button
+            type="button"
+            onClick={() => scrollToSection("profile")}
+            className="flex flex-col items-center gap-1 rounded-2xl border border-white/60 bg-white/70 py-2"
+          >
+            <HomeIcon className="h-5 w-5 text-orange-500" />
+            الرئيسية
+          </button>
+          <button
+            type="button"
+            onClick={() => scrollToSection("orders")}
+            className="flex flex-col items-center gap-1 rounded-2xl border border-white/60 bg-white/70 py-2"
+          >
+            <ClipboardDocumentListIcon className="h-5 w-5 text-slate-600" />
+            الطلبات
+          </button>
+          <button
+            type="button"
+            onClick={() => scrollToSection("wallet")}
+            className="flex flex-col items-center gap-1 rounded-2xl border border-white/60 bg-white/70 py-2"
+          >
+            <WalletIcon className="h-5 w-5 text-slate-600" />
+            المحفظة
+          </button>
+          <button
+            type="button"
+            onClick={() => toast("لا توجد إشعارات جديدة")}
+            className="flex flex-col items-center gap-1 rounded-2xl border border-white/60 bg-white/70 py-2"
+          >
+            <BellIcon className="h-5 w-5 text-slate-600" />
+            الإشعارات
+          </button>
+        </div>
+      </nav>
     </div>
   );
 }
+
+
 
 
