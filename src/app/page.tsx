@@ -59,11 +59,11 @@ type WalletTx = {
 };
 
 const statusStyles: Record<string, string> = {
-  pending: "bg-amber-500/20 text-amber-200 border-amber-400/40",
-  accepted: "bg-sky-500/20 text-sky-200 border-sky-400/40",
-  delivering: "bg-indigo-500/20 text-indigo-200 border-indigo-400/40",
-  delivered: "bg-orange-500/20 text-orange-200 border-orange-400/40",
-  cancelled: "bg-rose-500/20 text-rose-200 border-rose-400/40",
+  pending: "bg-amber-50 text-amber-700 border-amber-200",
+  accepted: "bg-sky-50 text-sky-700 border-sky-200",
+  delivering: "bg-indigo-50 text-indigo-700 border-indigo-200",
+  delivered: "bg-orange-50 text-orange-700 border-orange-200",
+  cancelled: "bg-rose-50 text-rose-700 border-rose-200",
 };
 
 const statusLabels: Record<string, string> = {
@@ -517,7 +517,7 @@ export default function DriverPanel() {
 
   if (!driver) {
     return (
-      <div className="min-h-screen bg-[#f5f7ff] text-slate-900 [background-image:radial-gradient(circle_at_top,rgba(255,255,255,0.9),transparent_55%),radial-gradient(circle_at_bottom,rgba(186,230,253,0.65),transparent_55%)]">
+      <div className="min-h-screen bg-[#eef1f6] text-slate-900 [background-image:radial-gradient(circle_at_top,rgba(255,255,255,0.85),transparent_60%),radial-gradient(circle_at_bottom,rgba(148,163,184,0.25),transparent_60%)]">
         <Toaster position="top-center" />
         <div className="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center px-5 py-10">
           <div className="rounded-[32px] border border-white/60 bg-white/70 p-6 shadow-[0_30px_80px_-40px_rgba(0,0,0,0.85)] backdrop-blur-xl">
@@ -535,7 +535,7 @@ export default function DriverPanel() {
                   </p>
                 </div>
               </div>
-              <span className="rounded-full border border-orange-400/30 bg-orange-500/10 px-3 py-1 text-xs font-semibold text-orange-200">
+              <span className="rounded-full border border-orange-200 bg-orange-50 px-3 py-1 text-xs font-semibold text-orange-700">
                 واجهة هاتفية
               </span>
             </div>
@@ -577,7 +577,7 @@ export default function DriverPanel() {
   }
 
   return (
-    <div className="min-h-screen bg-[#f5f7ff] text-slate-900 [background-image:radial-gradient(circle_at_top,rgba(255,255,255,0.9),transparent_55%),radial-gradient(circle_at_bottom,rgba(186,230,253,0.65),transparent_55%)]">
+    <div className="min-h-screen bg-[#eef1f6] text-slate-900 [background-image:radial-gradient(circle_at_top,rgba(255,255,255,0.85),transparent_60%),radial-gradient(circle_at_bottom,rgba(148,163,184,0.25),transparent_60%)]">
       <Toaster position="top-center" />
       {menuOpen && (
         <div className="fixed inset-0 z-50 flex justify-end">
@@ -696,13 +696,13 @@ export default function DriverPanel() {
                 <p className="text-sm text-slate-700">لوحة السائق</p>
               </div>
             </div>
-            <span className="rounded-full border border-orange-400/30 bg-orange-500/10 px-3 py-1 text-xs font-semibold text-orange-200">
+            <span className="rounded-full border border-orange-200 bg-orange-50 px-3 py-1 text-xs font-semibold text-orange-700">
               {formatDriverStatus(driver.status)}
             </span>
           </div>
-          <div className="mt-4 rounded-2xl border border-orange-400/30 bg-gradient-to-l from-orange-500/20 via-orange-500/10 to-transparent px-4 py-4">
-            <p className="text-xs text-orange-200">رصيد المحفظة</p>
-            <p className="text-3xl font-semibold text-orange-100">
+          <div className="mt-4 rounded-2xl border border-orange-200 bg-gradient-to-l from-orange-100/80 via-orange-50 to-transparent px-4 py-4">
+            <p className="text-xs text-slate-600">رصيد المحفظة</p>
+            <p className="text-3xl font-semibold text-slate-900">
               {typeof driver.wallet_balance === "number"
                 ? driver.wallet_balance.toFixed(2)
                 : "0.00"}
@@ -760,7 +760,7 @@ export default function DriverPanel() {
                 <button
                   type="button"
                   onClick={updatePhoto}
-                  className="h-11 rounded-xl border border-orange-400/40 bg-orange-500/10 text-sm font-semibold text-orange-100 transition hover:bg-orange-500/20"
+                  className="h-11 rounded-xl border border-orange-400/40 bg-orange-500/10 text-sm font-semibold text-slate-900 transition hover:bg-orange-500/20"
                 >
                   حفظ الصورة
                 </button>
@@ -781,7 +781,7 @@ export default function DriverPanel() {
               <button
                 type="button"
                 onClick={fetchTransactions}
-                className="text-xs text-orange-200"
+                className="text-xs text-slate-600"
               >
                 تحديث
               </button>
@@ -852,11 +852,11 @@ export default function DriverPanel() {
                         {order.order_type ?? "-"}
                       </p>
                     </div>
-                    <div className="rounded-xl border border-orange-400/30 bg-orange-500/10 px-3 py-2">
-                      <p className="tracking-[0.2em] text-[10px] text-orange-200">
+                    <div className="rounded-xl border border-orange-200 bg-orange-50 px-3 py-2">
+                      <p className="tracking-[0.2em] text-[10px] text-slate-600">
                         طريقة الدفع
                       </p>
-                      <p className="mt-1 text-sm font-semibold text-orange-100">
+                      <p className="mt-1 text-sm font-semibold text-slate-900">
                         {formatPayout(order.payout_method)}
                       </p>
                     </div>
@@ -896,7 +896,7 @@ export default function DriverPanel() {
               <div className="mt-4 grid gap-2">
                 {order.status === "pending" && (
                   <button
-                    className="flex h-14 items-center justify-center gap-2 rounded-2xl bg-sky-500 text-base font-semibold text-white transition hover:bg-sky-400"
+                    className="flex h-14 items-center justify-center gap-2 rounded-2xl bg-sky-200 text-base font-semibold text-slate-900 transition hover:bg-sky-300"
                     onClick={() => updateStatus(order.id, "accepted")}
                   >
                     <CheckCircleIcon className="h-5 w-5" />
@@ -905,7 +905,7 @@ export default function DriverPanel() {
                 )}
                 {order.status === "accepted" && (
                   <button
-                    className="flex h-14 items-center justify-center gap-2 rounded-2xl bg-indigo-500 text-base font-semibold text-white transition hover:bg-indigo-400"
+                    className="flex h-14 items-center justify-center gap-2 rounded-2xl bg-indigo-200 text-base font-semibold text-slate-900 transition hover:bg-indigo-300"
                     onClick={() => updateStatus(order.id, "delivering")}
                   >
                     <TruckIcon className="h-5 w-5" />
@@ -914,7 +914,7 @@ export default function DriverPanel() {
                 )}
                 {order.status === "delivering" && (
                   <button
-                    className="flex h-14 items-center justify-center gap-2 rounded-2xl bg-orange-500 text-base font-semibold text-white transition hover:bg-orange-400"
+                    className="flex h-14 items-center justify-center gap-2 rounded-2xl bg-orange-200 text-base font-semibold text-slate-900 transition hover:bg-orange-300"
                     onClick={() => updateStatus(order.id, "delivered")}
                   >
                     <BoltIcon className="h-5 w-5" />
@@ -980,6 +980,9 @@ export default function DriverPanel() {
     </div>
   );
 }
+
+
+
 
 
 
