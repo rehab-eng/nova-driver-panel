@@ -6,10 +6,15 @@ import { Toaster, toast } from "react-hot-toast";
 import { clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 import {
+  Bars3Icon,
   BoltIcon,
   CheckCircleIcon,
+  Cog6ToothIcon,
+  LifebuoyIcon,
+  ArrowRightOnRectangleIcon,
   TruckIcon,
   XCircleIcon,
+  XMarkIcon,
 } from "@heroicons/react/24/outline";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8787";
@@ -116,6 +121,7 @@ export default function DriverPanel() {
   const [photoUrl, setPhotoUrl] = useState("");
   const [transactions, setTransactions] = useState<WalletTx[]>([]);
   const [flashIds, setFlashIds] = useState<Set<string>>(new Set());
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const ordersRef = useRef<Order[]>([]);
   const hasLoadedRef = useRef(false);
@@ -141,6 +147,21 @@ export default function DriverPanel() {
   useEffect(() => {
     if (driver?.email) setEmail(driver.email);
   }, [driver]);
+
+  const logout = () => {
+    localStorage.removeItem("nova.driver");
+    localStorage.removeItem("nova.driver_code");
+    localStorage.removeItem("nova.driver_email");
+    setDriver(null);
+    setSecretCode("");
+    setEmail("");
+  };
+
+  const scrollToSection = (id: string) => {
+    const el = document.getElementById(id);
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+    setMenuOpen(false);
+  };
 
   useEffect(() => {
     localStorage.setItem("nova.driver_code", secretCode);
@@ -492,20 +513,20 @@ export default function DriverPanel() {
 
   if (!driver) {
     return (
-      <div className="min-h-screen bg-[#05070f] text-slate-100 [background-image:radial-gradient(circle_at_top,rgba(255,255,255,0.08),transparent_55%),radial-gradient(circle_at_bottom,rgba(255,153,0,0.14),transparent_55%)]">
+      <div className="min-h-screen bg-[#f5f7ff] text-slate-900 [background-image:radial-gradient(circle_at_top,rgba(255,255,255,0.9),transparent_55%),radial-gradient(circle_at_bottom,rgba(186,230,253,0.65),transparent_55%)]">
         <Toaster position="top-center" />
         <div className="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center px-5 py-10">
-          <div className="rounded-[32px] border border-white/10 bg-white/5 p-6 shadow-[0_30px_80px_-40px_rgba(0,0,0,0.85)] backdrop-blur-xl">
+          <div className="rounded-[32px] border border-white/60 bg-white/70 p-6 shadow-[0_30px_80px_-40px_rgba(0,0,0,0.85)] backdrop-blur-xl">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white">
                   <Image src="/logo.png" alt="NOVA MAX" width={46} height={46} />
                 </div>
                 <div className="text-right">
-                  <p className="text-xs tracking-[0.25em] text-slate-400">
+                  <p className="text-xs tracking-[0.25em] text-slate-500">
                     نوفا ماكس
                   </p>
-                  <p className="text-sm font-semibold text-slate-100">
+                  <p className="text-sm font-semibold text-slate-900">
                     لوحة السائق
                   </p>
                 </div>
@@ -517,26 +538,26 @@ export default function DriverPanel() {
 
             <div className="mt-6 text-right">
               <h1 className="text-2xl font-semibold">تسجيل دخول السائق</h1>
-              <p className="mt-2 text-sm text-slate-400">
+              <p className="mt-2 text-sm text-slate-500">
                 أدخل رقم الهاتف والكود السري من لوحة المتجر.
               </p>
             </div>
 
             <form onSubmit={login} className="mt-6 grid w-full gap-4">
               <input
-                className="h-14 rounded-2xl border border-slate-800 bg-slate-950 px-4 text-base text-slate-100 outline-none focus:border-orange-400/70"
+                className="h-14 rounded-2xl border border-white/60 bg-white/70 px-4 text-base text-slate-900 outline-none focus:border-orange-500/80"
                 placeholder="رقم الهاتف"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
               />
               <input
-                className="h-14 rounded-2xl border border-slate-800 bg-slate-950 px-4 text-base text-slate-100 outline-none focus:border-orange-400/70"
+                className="h-14 rounded-2xl border border-white/60 bg-white/70 px-4 text-base text-slate-900 outline-none focus:border-orange-500/80"
                 placeholder="البريد الإلكتروني"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
               />
               <input
-                className="h-14 rounded-2xl border border-slate-800 bg-slate-950 px-4 text-base text-slate-100 outline-none focus:border-orange-400/70"
+                className="h-14 rounded-2xl border border-white/60 bg-white/70 px-4 text-base text-slate-900 outline-none focus:border-orange-500/80"
                 placeholder="الكود السري"
                 value={secretCode}
                 onChange={(e) => setSecretCode(e.target.value)}
@@ -552,13 +573,103 @@ export default function DriverPanel() {
   }
 
   return (
-    <div className="min-h-screen bg-[#05070f] text-slate-100 [background-image:radial-gradient(circle_at_top,rgba(255,255,255,0.08),transparent_55%),radial-gradient(circle_at_bottom,rgba(255,153,0,0.14),transparent_55%)]">
+    <div className="min-h-screen bg-[#f5f7ff] text-slate-900 [background-image:radial-gradient(circle_at_top,rgba(255,255,255,0.9),transparent_55%),radial-gradient(circle_at_bottom,rgba(186,230,253,0.65),transparent_55%)]">
       <Toaster position="top-center" />
+      {menuOpen && (
+        <div className="fixed inset-0 z-50 flex justify-end">
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/20"
+            onClick={() => setMenuOpen(false)}
+            aria-label="إغلاق القائمة"
+          />
+          <div className="relative h-full w-[85%] max-w-xs bg-white/80 p-5 text-right shadow-2xl backdrop-blur-2xl">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs tracking-[0.25em] text-slate-500">نوفا ماكس</p>
+                <p className="text-base font-semibold text-slate-900">
+                  {driver.name ?? "السائق"}
+                </p>
+              </div>
+              <button
+                type="button"
+                className="rounded-full border border-white/60 bg-white/70 p-2"
+                onClick={() => setMenuOpen(false)}
+                aria-label="إغلاق"
+              >
+                <XMarkIcon className="h-5 w-5 text-slate-700" />
+              </button>
+            </div>
+
+            <div className="mt-6 space-y-3">
+              <button
+                type="button"
+                onClick={() => scrollToSection("profile")}
+                className="w-full rounded-2xl border border-white/60 bg-white/70 px-4 py-3 text-sm font-semibold text-slate-800"
+              >
+                الملف الشخصي
+              </button>
+              <button
+                type="button"
+                onClick={() => scrollToSection("wallet")}
+                className="w-full rounded-2xl border border-white/60 bg-white/70 px-4 py-3 text-sm font-semibold text-slate-800"
+              >
+                المحفظة
+              </button>
+              <button
+                type="button"
+                onClick={() => scrollToSection("orders")}
+                className="w-full rounded-2xl border border-white/60 bg-white/70 px-4 py-3 text-sm font-semibold text-slate-800"
+              >
+                الطلبات
+              </button>
+            </div>
+
+            <div className="mt-6 rounded-2xl border border-white/60 bg-white/70 p-4">
+              <div className="flex items-center gap-2 text-sm font-semibold text-slate-800">
+                <Cog6ToothIcon className="h-4 w-4 text-orange-500" />
+                الإعدادات
+              </div>
+              <div className="mt-3 space-y-2 text-xs text-slate-600">
+                <div className="flex items-center justify-between">
+                  <span>إشعارات الطلبات</span>
+                  <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-emerald-700">
+                    مفعّل
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span>الوضع الصامت</span>
+                  <span className="rounded-full bg-slate-200 px-2 py-0.5 text-slate-700">
+                    غير مفعّل
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-4 space-y-2">
+              <button
+                type="button"
+                className="flex w-full items-center justify-between rounded-2xl border border-white/60 bg-white/70 px-4 py-3 text-sm font-semibold text-slate-800"
+              >
+                الدعم الفني
+                <LifebuoyIcon className="h-4 w-4 text-slate-600" />
+              </button>
+              <button
+                type="button"
+                onClick={logout}
+                className="flex w-full items-center justify-between rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700"
+              >
+                تسجيل الخروج
+                <ArrowRightOnRectangleIcon className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="mx-auto flex min-h-screen w-full max-w-md flex-col px-4 py-6">
-        <header className="rounded-[28px] border border-white/10 bg-white/5 p-4 text-right shadow-[0_20px_50px_-30px_rgba(0,0,0,0.8)] backdrop-blur-xl">
+        <header className="rounded-[28px] border border-white/60 bg-white/70 p-4 text-right shadow-[0_20px_50px_-30px_rgba(0,0,0,0.8)] backdrop-blur-xl">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-2xl bg-white">
+            <div className="flex items-center gap-3">\n              <button\n                type="button"\n                onClick={() => setMenuOpen(true)}\n                className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/60 bg-white/70 text-slate-700"\n                aria-label="??? ???????"\n              >\n                <Bars3Icon className="h-5 w-5" />\n              </button>\n              <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-2xl bg-white">
               <img
                 src={driver.photo_url ?? "/logo.png"}
                 alt="NOVA MAX"
@@ -566,10 +677,10 @@ export default function DriverPanel() {
               />
             </div>
               <div>
-                <p className="text-xs tracking-[0.25em] text-slate-400">
+                <p className="text-xs tracking-[0.25em] text-slate-500">
                   نوفا ماكس
                 </p>
-                <p className="text-sm text-slate-200">لوحة السائق</p>
+                <p className="text-sm text-slate-700">لوحة السائق</p>
               </div>
             </div>
             <span className="rounded-full border border-orange-400/30 bg-orange-500/10 px-3 py-1 text-xs font-semibold text-orange-200">
@@ -586,27 +697,30 @@ export default function DriverPanel() {
           </div>
         </header>
 
-        <section className="mt-4 rounded-[26px] border border-white/10 bg-white/5 p-4 text-right shadow-[0_16px_40px_-28px_rgba(0,0,0,0.75)] backdrop-blur-xl">
-          <p className="text-xs tracking-[0.25em] text-slate-400">بيانات السائق</p>
-          <p className="mt-2 text-lg font-semibold text-slate-100">
+        <section
+          id="profile"
+          className="mt-4 rounded-[26px] border border-white/60 bg-white/70 p-4 text-right shadow-[0_16px_40px_-28px_rgba(0,0,0,0.75)] backdrop-blur-xl"
+        >
+          <p className="text-xs tracking-[0.25em] text-slate-500">بيانات السائق</p>
+          <p className="mt-2 text-lg font-semibold text-slate-900">
             {driver.name ?? "السائق"}
           </p>
           <div className="mt-4 grid gap-3">
-            <div className="rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3">
+            <div className="rounded-2xl border border-white/60 bg-white/70 px-4 py-3">
               <p className="text-xs tracking-[0.2em] text-slate-500">الهاتف</p>
-              <p className="mt-1 text-sm font-semibold text-slate-100">
+              <p className="mt-1 text-sm font-semibold text-slate-900">
                 {driver.phone ?? phone ?? "-"}
               </p>
             </div>
-            <div className="rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3">
+            <div className="rounded-2xl border border-white/60 bg-white/70 px-4 py-3">
               <p className="text-xs tracking-[0.2em] text-slate-500">البريد الإلكتروني</p>
-              <p className="mt-1 text-sm font-semibold text-slate-100">
+              <p className="mt-1 text-sm font-semibold text-slate-900">
                 {driver.email ?? email ?? "-"}
               </p>
             </div>
-            <div className="rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3">
+            <div className="rounded-2xl border border-white/60 bg-white/70 px-4 py-3">
               <p className="text-xs tracking-[0.2em] text-slate-500">الكود السري</p>
-              <p className="mt-1 text-sm font-semibold text-slate-100">
+              <p className="mt-1 text-sm font-semibold text-slate-900">
                 {secretCode || "-"}
               </p>
             </div>
@@ -619,13 +733,13 @@ export default function DriverPanel() {
             >
               {driver.status === "online" ? "تحويل إلى غير متصل" : "تحويل إلى متصل"}
             </button>
-            <div className="rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3">
+            <div className="rounded-2xl border border-white/60 bg-white/70 px-4 py-3">
               <p className="text-xs tracking-[0.2em] text-slate-500">
                 رابط صورة السائق
               </p>
               <div className="mt-2 flex flex-col gap-2">
                 <input
-                  className="h-11 rounded-xl border border-slate-700 bg-slate-900 px-3 text-sm text-slate-100 outline-none focus:border-orange-400/70"
+                  className="h-11 rounded-xl border border-white/60 bg-white/70 px-3 text-sm text-slate-900 outline-none focus:border-orange-500/80"
                   placeholder="https://"
                   value={photoUrl}
                   onChange={(e) => setPhotoUrl(e.target.value)}
@@ -642,10 +756,13 @@ export default function DriverPanel() {
           </div>
         </section>
 
-        <section className="mt-5 flex-1 space-y-4 pb-8 text-right">
-          <div className="rounded-[26px] border border-white/10 bg-white/5 p-4 shadow-[0_16px_36px_-24px_rgba(0,0,0,0.7)] backdrop-blur-xl">
+        <section id="orders" className="mt-5 flex-1 space-y-4 pb-8 text-right">
+          <div
+            id="wallet"
+            className="rounded-[26px] border border-white/60 bg-white/70 p-4 shadow-[0_16px_36px_-24px_rgba(0,0,0,0.7)] backdrop-blur-xl"
+          >
             <div className="flex items-center justify-between">
-              <p className="text-sm font-semibold text-slate-100">
+              <p className="text-sm font-semibold text-slate-900">
                 حركات المحفظة الأخيرة
               </p>
               <button
@@ -658,20 +775,20 @@ export default function DriverPanel() {
             </div>
             <div className="mt-3 space-y-2 text-sm">
               {transactions.length === 0 && (
-                <div className="rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-center text-slate-400">
+                <div className="rounded-2xl border border-white/60 bg-white/70 px-4 py-3 text-center text-slate-500">
                   لا توجد حركات بعد.
                 </div>
               )}
               {transactions.map((tx) => (
                 <div
                   key={tx.id}
-                  className="flex items-center justify-between rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3"
+                  className="flex items-center justify-between rounded-2xl border border-white/60 bg-white/70 px-4 py-3"
                 >
                   <div>
-                    <p className="text-sm font-semibold text-slate-100">
+                    <p className="text-sm font-semibold text-slate-900">
                       {formatTxType(tx.type)}
                     </p>
-                    <p className="mt-1 text-xs text-slate-400">
+                    <p className="mt-1 text-xs text-slate-500">
                       {formatPayout(tx.method)}
                       {tx.note ? ` · ${tx.note}` : ""}
                     </p>
@@ -693,32 +810,32 @@ export default function DriverPanel() {
             <div
               key={order.id}
               className={cn(
-                "rounded-[26px] border border-white/10 bg-white/5 p-5 shadow-[0_16px_36px_-24px_rgba(0,0,0,0.7)] transition backdrop-blur-xl",
+                "rounded-[26px] border border-white/60 bg-white/70 p-5 shadow-[0_16px_36px_-24px_rgba(0,0,0,0.7)] transition backdrop-blur-xl",
                 flashIds.has(order.id) ? "ring-2 ring-orange-400/70" : ""
               )}
             >
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  <p className="text-lg font-semibold text-slate-100">
+                  <p className="text-lg font-semibold text-slate-900">
                     {order.customer_name ?? "العميل"}
                   </p>
-                  <p className="mt-1 text-sm text-slate-400">
+                  <p className="mt-1 text-sm text-slate-500">
                     {order.customer_location_text ?? "الموقع غير محدد"}
                   </p>
-                  <div className="mt-3 grid gap-2 text-xs text-slate-400">
-                    <div className="rounded-xl border border-slate-800 bg-slate-950 px-3 py-2">
+                  <div className="mt-3 grid gap-2 text-xs text-slate-500">
+                    <div className="rounded-xl border border-white/60 bg-white/70 px-3 py-2">
                       <p className="tracking-[0.2em] text-[10px] text-slate-500">
                         المستلم
                       </p>
-                      <p className="mt-1 text-sm text-slate-100">
+                      <p className="mt-1 text-sm text-slate-900">
                         {order.receiver_name ?? "-"}
                       </p>
                     </div>
-                    <div className="rounded-xl border border-slate-800 bg-slate-950 px-3 py-2">
+                    <div className="rounded-xl border border-white/60 bg-white/70 px-3 py-2">
                       <p className="tracking-[0.2em] text-[10px] text-slate-500">
                         نوع الطلب
                       </p>
-                      <p className="mt-1 text-sm text-slate-100">
+                      <p className="mt-1 text-sm text-slate-900">
                         {order.order_type ?? "-"}
                       </p>
                     </div>
@@ -735,19 +852,19 @@ export default function DriverPanel() {
                 <span
                   className={cn(
                     "inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold",
-                    statusStyles[order.status ?? ""] ?? "border-slate-700 text-slate-300"
+                    statusStyles[order.status ?? ""] ?? "border-white/60 text-slate-700"
                   )}
                 >
                   {formatStatus(order.status)}
                 </span>
               </div>
 
-              <div className="mt-4 flex items-center justify-between rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm">
+              <div className="mt-4 flex items-center justify-between rounded-2xl border border-white/60 bg-white/70 px-4 py-3 text-sm">
                 <div>
                   <p className="text-xs tracking-[0.2em] text-slate-500">
                     رسوم التوصيل
                   </p>
-                  <p className="mt-1 text-base font-semibold text-slate-100">
+                  <p className="mt-1 text-base font-semibold text-slate-900">
                     {typeof order.delivery_fee === "number"
                       ? order.delivery_fee.toFixed(2)
                       : "-"}
@@ -757,7 +874,7 @@ export default function DriverPanel() {
                   <p className="text-xs tracking-[0.2em] text-slate-500">
                     الطلب
                   </p>
-                  <p className="mt-1 text-base font-semibold text-slate-100">
+                  <p className="mt-1 text-base font-semibold text-slate-900">
                     {order.id.slice(0, 6)}...
                   </p>
                 </div>
@@ -805,7 +922,7 @@ export default function DriverPanel() {
           ))}
 
           {orders.length === 0 && (
-            <div className="rounded-[26px] border border-slate-800/80 bg-slate-900/70 px-6 py-8 text-center text-base text-slate-300">
+            <div className="rounded-[26px] border border-white/60/80 bg-white/70/70 px-6 py-8 text-center text-base text-slate-700">
               لا توجد طلبات مخصصة بعد.
             </div>
           )}
@@ -814,3 +931,5 @@ export default function DriverPanel() {
     </div>
   );
 }
+
+
