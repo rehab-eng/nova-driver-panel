@@ -173,6 +173,7 @@ export default function DriverPanel() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [biometricSupported, setBiometricSupported] = useState(false);
   const [biometricLinked, setBiometricLinked] = useState(false);
+  const [walletUnlocked, setWalletUnlocked] = useState(false);
   const [activeSection, setActiveSection] = useState<
     "home" | "orders" | "wallet" | "notifications" | "profile" | "history" | "support"
   >("home");
@@ -224,10 +225,11 @@ export default function DriverPanel() {
     setSecretCode("");
     setEmail("");
     setActiveSection("home");
+    setWalletUnlocked(false);
     window.location.reload();
   };
 
-  const goToSection = (
+  const goToSection = async (
     section:
       | "home"
       | "orders"
@@ -237,6 +239,11 @@ export default function DriverPanel() {
       | "history"
       | "support"
   ) => {
+    if (section === "wallet") {
+      const biometricOk = await ensureBiometric();
+      if (!biometricOk) return;
+      setWalletUnlocked(true);
+    }
     setActiveSection(section);
     setMenuOpen(false);
   };
@@ -645,6 +652,8 @@ export default function DriverPanel() {
   const historyOrders = orders.filter(
     (order) => order.status === "delivered" || order.status === "cancelled"
   );
+  const deliveredCount = historyOrders.filter((order) => order.status === "delivered")
+    .length;
   const deliveringCount = activeOrders.filter((order) => order.status === "delivering")
     .length;
   const pendingCount = activeOrders.filter((order) => order.status === "pending")
@@ -865,9 +874,9 @@ export default function DriverPanel() {
                 </p>
               </div>
               <div className="rounded-[22px] border border-white/70 bg-white/80 p-4 shadow-sm backdrop-blur-xl">
-                <p className="text-xs text-slate-500">رصيد المحفظة</p>
+                <p className="text-xs text-slate-500">تم التسليم</p>
                 <p className="mt-2 text-2xl font-semibold text-slate-900">
-                  {walletBalance.toFixed(2)}
+                  {deliveredCount}
                 </p>
               </div>
             </div>
@@ -893,59 +902,84 @@ export default function DriverPanel() {
 
         {activeSection === "wallet" && (
           <section className="mt-4 space-y-4 pb-8 text-right">
-            <div className="rounded-[26px] border border-white/70 bg-white/80 p-5 shadow-[0_16px_36px_-24px_rgba(0,0,0,0.25)] backdrop-blur-xl">
-              <p className="text-xs text-slate-500">رصيد المحفظة الحالي</p>
-              <p className="mt-3 text-3xl font-semibold text-slate-900">
-                {walletBalance.toFixed(2)}
-              </p>
-              <p className="mt-1 text-xs text-slate-500">آخر خمس حركات مالية</p>
-            </div>
-
-            <div className="rounded-[26px] border border-white/70 bg-white/80 p-4 shadow-sm backdrop-blur-xl">
-              <div className="flex items-center justify-between">
+            {!walletUnlocked ? (
+              <div className="rounded-[26px] border border-white/70 bg-white/80 p-6 text-center shadow-sm backdrop-blur-xl">
                 <p className="text-sm font-semibold text-slate-900">
-                  الحركات المالية الأخيرة
+                  التحقق قبل عرض المحفظة
+                </p>
+                <p className="mt-2 text-xs text-slate-500">
+                  نحتاج تأكيد البصمة قبل إظهار البيانات المالية.
                 </p>
                 <button
                   type="button"
-                  onClick={fetchTransactions}
-                  className="text-xs text-slate-600"
+                  onClick={async () => {
+                    const ok = await ensureBiometric();
+                    if (ok) setWalletUnlocked(true);
+                  }}
+                  className="mt-4 h-11 rounded-2xl bg-gradient-to-l from-orange-500 to-amber-400 px-5 text-sm font-semibold text-white shadow-lg shadow-orange-500/30"
                 >
-                  تحديث
+                  تأكيد الهوية
                 </button>
               </div>
-              <div className="mt-3 space-y-2 text-sm">
-                {transactions.length === 0 && (
-                  <div className="rounded-2xl border border-white/70 bg-white/80 px-4 py-3 text-center text-slate-500">
-                    لا توجد حركات بعد.
-                  </div>
-                )}
-                {transactions.map((tx) => (
-                  <div
-                    key={tx.id}
-                    className="flex items-center justify-between rounded-2xl border border-white/70 bg-white/80 px-4 py-3"
-                  >
-                    <div>
-                      <p className="text-sm font-semibold text-slate-900">
-                        {formatTxType(tx.type)}
-                      </p>
-                      <p className="mt-1 text-xs text-slate-500">
-                        {formatPayout(tx.method)}
-                        {tx.note ? ` · ${tx.note}` : ""}
-                      </p>
-                    </div>
-                    <p
-                      className={`text-sm font-semibold ${
-                        tx.type === "credit" ? "text-emerald-600" : "text-rose-600"
-                      }`}
-                    >
-                      {tx.type === "debit" ? "-" : "+"}
-                      {Number.isFinite(tx.amount) ? tx.amount.toFixed(2) : "-"}
+            ) : (
+              <>
+                <div className="rounded-[26px] border border-white/70 bg-white/80 p-5 shadow-[0_16px_36px_-24px_rgba(0,0,0,0.25)] backdrop-blur-xl">
+                  <p className="text-xs text-slate-500">رصيد المحفظة الحالي</p>
+                  <p className="mt-3 text-3xl font-semibold text-slate-900">
+                    {walletBalance.toFixed(2)}
+                  </p>
+                  <p className="mt-1 text-xs text-slate-500">آخر خمس حركات مالية</p>
+                </div>
+
+                <div className="rounded-[26px] border border-white/70 bg-white/80 p-4 shadow-sm backdrop-blur-xl">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-semibold text-slate-900">
+                      الحركات المالية الأخيرة
                     </p>
+                    <button
+                      type="button"
+                      onClick={fetchTransactions}
+                      className="text-xs text-slate-600"
+                    >
+                      تحديث
+                    </button>
                   </div>
-                ))}
-              </div>
-            </div>
+                  <div className="mt-3 space-y-2 text-sm">
+                    {transactions.length === 0 && (
+                      <div className="rounded-2xl border border-white/70 bg-white/80 px-4 py-3 text-center text-slate-500">
+                        لا توجد حركات بعد.
+                      </div>
+                    )}
+                    {transactions.map((tx) => (
+                      <div
+                        key={tx.id}
+                        className="flex items-center justify-between rounded-2xl border border-white/70 bg-white/80 px-4 py-3"
+                      >
+                        <div>
+                          <p className="text-sm font-semibold text-slate-900">
+                            {formatTxType(tx.type)}
+                          </p>
+                          <p className="mt-1 text-xs text-slate-500">
+                            {formatPayout(tx.method)}
+                            {tx.note ? ` · ${tx.note}` : ""}
+                          </p>
+                        </div>
+                        <p
+                          className={`text-sm font-semibold ${
+                            tx.type === "credit"
+                              ? "text-emerald-600"
+                              : "text-rose-600"
+                          }`}
+                        >
+                          {tx.type === "debit" ? "-" : "+"}
+                          {Number.isFinite(tx.amount) ? tx.amount.toFixed(2) : "-"}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
           </section>
         )}
 
