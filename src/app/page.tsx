@@ -32,7 +32,6 @@ type Driver = {
   id: string;
   name: string | null;
   phone: string | null;
-  email: string | null;
   status: string | null;
   wallet_balance: number | null;
   photo_url: string | null;
@@ -164,7 +163,6 @@ function buildWsUrl(path: string, params: Record<string, string>): string {
 
 export default function DriverPanel() {
   const [phone, setPhone] = useState("");
-  const [email, setEmail] = useState("");
   const [secretCode, setSecretCode] = useState("");
   const [driver, setDriver] = useState<Driver | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
@@ -186,10 +184,6 @@ export default function DriverPanel() {
   useEffect(() => {
     const storedDriver = localStorage.getItem("nova.driver");
     const storedCode = localStorage.getItem("nova.driver_code");
-    const storedEmail = localStorage.getItem("nova.driver_email");
-    if (storedDriver) setDriver(JSON.parse(storedDriver));
-    if (storedCode) setSecretCode(storedCode);
-    if (storedEmail) setEmail(storedEmail);
   }, []);
 
   useEffect(() => {
@@ -199,10 +193,6 @@ export default function DriverPanel() {
   useEffect(() => {
     if (driver) localStorage.setItem("nova.driver", JSON.stringify(driver));
   }, [driver, secretCode]);
-
-  useEffect(() => {
-    if (driver?.email) setEmail(driver.email);
-  }, [driver]);
 
   const getBiometricKey = () => {
     if (!phone.trim() || !secretCode.trim()) return null;
@@ -218,12 +208,10 @@ export default function DriverPanel() {
   const logout = () => {
     localStorage.removeItem("nova.driver");
     localStorage.removeItem("nova.driver_code");
-    localStorage.removeItem("nova.driver_email");
     const key = getBiometricKey();
     if (key) localStorage.removeItem(key);
     setDriver(null);
     setSecretCode("");
-    setEmail("");
     setActiveSection("home");
     setWalletUnlocked(false);
     window.location.reload();
@@ -251,10 +239,6 @@ export default function DriverPanel() {
   useEffect(() => {
     localStorage.setItem("nova.driver_code", secretCode);
   }, [secretCode]);
-
-  useEffect(() => {
-    localStorage.setItem("nova.driver_email", email);
-  }, [email]);
 
   const flashOrder = (id: string) => {
     setFlashIds((prev) => {
@@ -414,13 +398,10 @@ export default function DriverPanel() {
     };
 
     const startSocket = () => {
-      const driverEmail = driver.email ?? email;
-      if (!driverEmail) return;
       const wsUrl = buildWsUrl("/realtime", {
         role: "driver",
         driver_id: driver.id,
         secret_code: secretCode,
-        email: driverEmail,
       });
       socket = new WebSocket(wsUrl);
 
@@ -473,7 +454,7 @@ export default function DriverPanel() {
       if (reconnectTimer) window.clearTimeout(reconnectTimer);
       window.clearInterval(poll);
     };
-  }, [driver, email, secretCode]);
+  }, [driver, secretCode]);
 
   useEffect(() => {
     if (!driver) return;
@@ -519,7 +500,7 @@ export default function DriverPanel() {
           rp: { name: "Nova Max WS" },
           user: {
             id: userId,
-            name: driverInfo.email ?? phone ?? "driver",
+            name: driverInfo.phone ?? phone ?? "driver",
             displayName: driverInfo.name ?? "Driver",
           },
           pubKeyCredParams: [
@@ -544,10 +525,6 @@ export default function DriverPanel() {
 
   const login = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email.trim()) {
-      toast.error("البريد الإلكتروني مطلوب");
-      return;
-    }
     const biometricOk = await ensureBiometric();
     if (!biometricOk) return;
     const toastId = toast.loading("جاري تسجيل الدخول...");
@@ -556,7 +533,7 @@ export default function DriverPanel() {
       const res = await fetch(`${API_BASE}/drivers/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone, email, secret_code: secretCode }),
+        body: JSON.stringify({ phone, secret_code: secretCode }),
       });
 
       const data = await res.json();
@@ -690,18 +667,6 @@ export default function DriverPanel() {
             </div>
 
             <form onSubmit={login} className="mt-6 grid w-full gap-4">
-              <input
-                className="h-14 rounded-2xl border border-white/70 bg-white/80 px-4 text-base text-slate-900 outline-none focus:border-orange-500/80"
-                placeholder="رقم الهاتف"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-              />
-              <input
-                className="h-14 rounded-2xl border border-white/70 bg-white/80 px-4 text-base text-slate-900 outline-none focus:border-orange-500/80"
-                placeholder="البريد الإلكتروني"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-              />
               <input
                 className="h-14 rounded-2xl border border-white/70 bg-white/80 px-4 text-base text-slate-900 outline-none focus:border-orange-500/80"
                 placeholder="الكود السري"
@@ -1129,14 +1094,8 @@ export default function DriverPanel() {
                     {driver.phone ?? phone ?? "-"}
                   </p>
                 </div>
-                <div className="rounded-2xl border border-white/70 bg-white/80 px-4 py-3">
-                  <p className="text-xs tracking-[0.2em] text-slate-500">
-                    البريد الإلكتروني
-                  </p>
-                  <p className="mt-1 text-sm font-semibold text-slate-900">
-                    {driver.email ?? email ?? "-"}
-                  </p>
-                </div>
+                
+
                 <div className="rounded-2xl border border-white/70 bg-white/80 px-4 py-3">
                   <p className="text-xs tracking-[0.2em] text-slate-500">الحالة</p>
                   <p className="mt-1 text-sm font-semibold text-slate-900">
