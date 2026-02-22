@@ -6,21 +6,21 @@ import { Toaster, toast } from "react-hot-toast";
 import { clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 import {
-  ArrowRightOnRectangleIcon,
-  Bars3Icon,
-  BellIcon,
-  BoltIcon,
-  CheckCircleIcon,
-  ClipboardDocumentListIcon,
-  ClockIcon,
-  HomeIcon,
-  LifebuoyIcon,
-  MapPinIcon,
-  TruckIcon,
-  UserCircleIcon,
-  WalletIcon,
-  XCircleIcon,
-  XMarkIcon,
+  LogOut,
+  Menu,
+  Bell,
+  Zap,
+  CheckCircle2,
+  ClipboardList,
+  Clock,
+  Home,
+  LifeBuoy,
+  MapPin,
+  Truck,
+  UserCircle2,
+  Wallet,
+  XCircle,
+  X,
 } from "@heroicons/react/24/outline";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8787";
@@ -35,10 +35,14 @@ type Driver = {
   status: string | null;
   wallet_balance: number | null;
   photo_url: string | null;
+  store_id?: string | null;
 };
 
 type Order = {
   id: string;
+  store_id?: string | null;
+  store_name?: string | null;
+  store_code?: string | null;
   driver_id?: string | null;
   customer_name: string | null;
   customer_location_text: string | null;
@@ -309,12 +313,16 @@ export default function DriverPanel() {
 
     const fetchOrders = async (showToasts: boolean) => {
       try {
-        const res = await fetch(
-          `${API_BASE}/orders?driver_id=${encodeURIComponent(driver.id)}`
-        );
+        const query = driver.store_id
+          ? `store_id=${encodeURIComponent(driver.store_id)}`
+          : `driver_id=${encodeURIComponent(driver.id)}`;
+        const res = await fetch(`${API_BASE}/orders?${query}`);
         const data = await res.json();
         if (active && data?.orders) {
-          applyOrders(data.orders, showToasts && hasLoadedRef.current);
+          const visible = (data.orders as Order[]).filter(
+            (order) => !order.driver_id || order.driver_id === driver.id
+          );
+          applyOrders(visible, showToasts && hasLoadedRef.current);
           if (!hasLoadedRef.current) hasLoadedRef.current = true;
         }
       } catch {
@@ -401,7 +409,10 @@ export default function DriverPanel() {
       const wsUrl = buildWsUrl("/realtime", {
         role: "driver",
         driver_id: driver.id,
+        driver_code: secretCode,
         secret_code: secretCode,
+        driver_code: secretCode,
+          driver_code: secretCode,
       });
       socket = new WebSocket(wsUrl);
 
@@ -533,7 +544,9 @@ export default function DriverPanel() {
       const res = await fetch(`${API_BASE}/drivers/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone, secret_code: secretCode }),
+        body: JSON.stringify({ phone, secret_code: secretCode,
+        driver_code: secretCode,
+          driver_code: secretCode, driver_code: secretCode }),
       });
 
       const data = await res.json();
@@ -608,6 +621,8 @@ export default function DriverPanel() {
           status,
           driver_id: driver.id,
           secret_code: secretCode,
+        driver_code: secretCode,
+          driver_code: secretCode,
         }),
       });
 
@@ -669,7 +684,7 @@ export default function DriverPanel() {
             <form onSubmit={login} className="mt-6 grid w-full gap-4">
               <input
                 className="h-14 rounded-2xl border border-white/70 bg-white/80 px-4 text-base text-slate-900 outline-none focus:border-orange-500/80"
-                placeholder="الكود السري"
+                placeholder="كود السائق"
                 value={secretCode}
                 onChange={(e) => setSecretCode(e.target.value)}
               />
@@ -714,7 +729,7 @@ export default function DriverPanel() {
                 onClick={() => setMenuOpen(false)}
                 aria-label="إغلاق"
               >
-                <XMarkIcon className="h-5 w-5 text-slate-700" />
+                <X className="h-5 w-5 text-slate-700" />
               </button>
             </div>
 
@@ -725,7 +740,7 @@ export default function DriverPanel() {
                 className="flex w-full items-center justify-between rounded-2xl border border-white/70 bg-white/80 px-4 py-3 text-sm font-semibold text-slate-800"
               >
                 الملف الشخصي
-                <UserCircleIcon className="h-4 w-4 text-slate-500" />
+                <UserCircle2 className="h-4 w-4 text-slate-500" />
               </button>
               <button
                 type="button"
@@ -733,7 +748,7 @@ export default function DriverPanel() {
                 className="flex w-full items-center justify-between rounded-2xl border border-white/70 bg-white/80 px-4 py-3 text-sm font-semibold text-slate-800"
               >
                 سجل الطلبات
-                <ClipboardDocumentListIcon className="h-4 w-4 text-slate-500" />
+                <ClipboardList className="h-4 w-4 text-slate-500" />
               </button>
               <button
                 type="button"
@@ -741,7 +756,7 @@ export default function DriverPanel() {
                 className="flex w-full items-center justify-between rounded-2xl border border-white/70 bg-white/80 px-4 py-3 text-sm font-semibold text-slate-800"
               >
                 الدعم الفني
-                <LifebuoyIcon className="h-4 w-4 text-slate-500" />
+                <LifeBuoy className="h-4 w-4 text-slate-500" />
               </button>
             </div>
 
@@ -771,7 +786,7 @@ export default function DriverPanel() {
               className="mt-6 flex w-full items-center justify-between rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700"
             >
               تسجيل الخروج
-              <ArrowRightOnRectangleIcon className="h-4 w-4" />
+              <LogOut className="h-4 w-4" />
             </button>
           </div>
         </div>
@@ -798,7 +813,7 @@ export default function DriverPanel() {
               className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/70 bg-white/80 text-slate-700 shadow-sm"
               aria-label="فتح القائمة"
             >
-              <Bars3Icon className="h-5 w-5" />
+              <Menu className="h-5 w-5" />
             </button>
           </div>
           <div className="mt-4 flex items-center justify-between">
@@ -960,13 +975,16 @@ export default function DriverPanel() {
               >
                 <div className="flex items-start gap-4">
                   <div className="flex h-24 w-24 items-center justify-center rounded-2xl border border-white/70 bg-gradient-to-br from-sky-100 via-white to-orange-100">
-                    <MapPinIcon className="h-6 w-6 text-orange-500" />
+                    <MapPin className="h-6 w-6 text-orange-500" />
                   </div>
                   <div className="flex-1">
                     <div className="flex items-start justify-between gap-2">
                       <div>
                         <p className="text-lg font-semibold text-slate-900">
                           {order.customer_name ?? "العميل"}
+                        </p>
+                        <p className="mt-1 text-xs text-slate-500">
+                          المتجر: {order.store_name ?? order.store_code ?? (order.store_id ? `${order.store_id.slice(0, 6)}...` : "-")}
                         </p>
                         <p className="mt-1 text-sm text-slate-500">
                           {order.customer_location_text ?? "الموقع غير محدد"}
@@ -986,7 +1004,7 @@ export default function DriverPanel() {
                     <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-slate-600">
                       <div className="rounded-xl border border-white/70 bg-white/80 px-3 py-2">
                         <p className="flex items-center gap-1 text-[10px] text-slate-500">
-                          <ClockIcon className="h-3 w-3" />
+                          <Clock className="h-3 w-3" />
                           التوقيت
                         </p>
                         <p className="mt-1 text-sm text-slate-900">
@@ -1011,7 +1029,7 @@ export default function DriverPanel() {
                       className="flex h-12 items-center justify-center gap-2 rounded-2xl bg-sky-200 text-sm font-semibold text-slate-900 transition hover:bg-sky-300"
                       onClick={() => updateStatus(order.id, "accepted")}
                     >
-                      <CheckCircleIcon className="h-5 w-5" />
+                      <CheckCircle2 className="h-5 w-5" />
                       قبول الطلب
                     </button>
                   )}
@@ -1020,7 +1038,7 @@ export default function DriverPanel() {
                       className="flex h-12 items-center justify-center gap-2 rounded-2xl bg-indigo-200 text-sm font-semibold text-slate-900 transition hover:bg-indigo-300"
                       onClick={() => updateStatus(order.id, "delivering")}
                     >
-                      <TruckIcon className="h-5 w-5" />
+                      <Truck className="h-5 w-5" />
                       بدء التوصيل
                     </button>
                   )}
@@ -1029,7 +1047,7 @@ export default function DriverPanel() {
                       className="flex h-12 items-center justify-center gap-2 rounded-2xl bg-orange-200 text-sm font-semibold text-slate-900 transition hover:bg-orange-300"
                       onClick={() => updateStatus(order.id, "delivered")}
                     >
-                      <BoltIcon className="h-5 w-5" />
+                      <Zap className="h-5 w-5" />
                       تم التسليم
                     </button>
                   )}
@@ -1038,7 +1056,7 @@ export default function DriverPanel() {
                       className="flex h-12 items-center justify-center gap-2 rounded-2xl border border-rose-300 bg-rose-50 text-sm font-semibold text-rose-700 transition hover:bg-rose-100"
                       onClick={() => updateStatus(order.id, "cancelled")}
                     >
-                      <XCircleIcon className="h-5 w-5" />
+                      <XCircle className="h-5 w-5" />
                       إلغاء الطلب
                     </button>
                   )}
@@ -1203,7 +1221,7 @@ export default function DriverPanel() {
                 : "border-white/70 bg-white/80 text-slate-600"
             )}
           >
-            <HomeIcon className="h-5 w-5" />
+            <Home className="h-5 w-5" />
             الرئيسية
           </button>
           <button
@@ -1216,7 +1234,7 @@ export default function DriverPanel() {
                 : "border-white/70 bg-white/80 text-slate-600"
             )}
           >
-            <ClipboardDocumentListIcon className="h-5 w-5" />
+            <ClipboardList className="h-5 w-5" />
             الطلبات
           </button>
           <button
@@ -1229,7 +1247,7 @@ export default function DriverPanel() {
                 : "border-white/70 bg-white/80 text-slate-600"
             )}
           >
-            <WalletIcon className="h-5 w-5" />
+            <Wallet className="h-5 w-5" />
             المحفظة
           </button>
           <button
@@ -1242,7 +1260,7 @@ export default function DriverPanel() {
                 : "border-white/70 bg-white/80 text-slate-600"
             )}
           >
-            <BellIcon className="h-5 w-5" />
+            <Bell className="h-5 w-5" />
             الإشعارات
             {notifications.length > 0 && (
               <span className="absolute -top-1 right-2 rounded-full bg-orange-500 px-1.5 text-[10px] font-semibold text-white">
