@@ -395,8 +395,6 @@ export default function DriverPanel() {
         driver_id: driver.id,
         driver_code: secretCode,
         secret_code: secretCode,
-        driver_code: secretCode,
-          driver_code: secretCode,
       });
       socket = new WebSocket(wsUrl);
 
@@ -528,9 +526,7 @@ export default function DriverPanel() {
       const res = await fetch(`${API_BASE}/drivers/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone, secret_code: secretCode,
-        driver_code: secretCode,
-          driver_code: secretCode, driver_code: secretCode }),
+        body: JSON.stringify({ phone, secret_code: secretCode, driver_code: secretCode }),
       });
 
       const data = await res.json();
@@ -578,7 +574,7 @@ export default function DriverPanel() {
       const res = await fetch(`${API_BASE}/drivers/${driver.id}/status`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json", "X-Driver-Code": secretCode },
-        body: JSON.stringify({ status: nextStatus, secret_code: secretCode }),
+        body: JSON.stringify({ status: nextStatus, secret_code: secretCode, driver_code: secretCode }),
       });
       const data = await res.json();
       if (data?.ok) {
@@ -605,7 +601,6 @@ export default function DriverPanel() {
           status,
           driver_id: driver.id,
           secret_code: secretCode,
-        driver_code: secretCode,
           driver_code: secretCode,
         }),
       });
