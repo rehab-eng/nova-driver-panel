@@ -1,27 +1,7 @@
-"use client";
+﻿"use client";
 
 import Image from "next/image";
-import { useEffect, useRef, useState } from "react";
-import { Toaster, toast } from "react-hot-toast";
-import { clsx } from "clsx";
-import { twMerge } from "tailwind-merge";
-import {
-  LogOut,
-  Menu,
-  Bell,
-  Zap,
-  CheckCircle2,
-  ClipboardList,
-  Clock,
-  Home,
-  LifeBuoy,
-  MapPin,
-  Truck,
-  UserCircle2,
-  Wallet,
-  XCircle,
-  X,
-} from "@heroicons/react/24/outline";
+import { Bell, CheckCircle2, ClipboardList, Clock, Home, LifeBuoy, LogOut, MapPin, Menu, Truck, UserCircle2, Wallet, X, XCircle, Zap } from "lucide-react";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8787";
 
@@ -1273,3 +1253,4 @@ export default function DriverPanel() {
     </div>
   );
 }
+
