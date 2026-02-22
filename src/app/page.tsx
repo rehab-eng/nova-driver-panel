@@ -1,13 +1,12 @@
 ﻿"use client";
 
-import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import { Toaster, toast } from "react-hot-toast";
 import { clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { Bell, CheckCircle2, ClipboardList, Clock, Home, LifeBuoy, LogOut, MapPin, Menu, Truck, UserCircle2, Wallet, X, XCircle, Zap } from "lucide-react";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8787";
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "https://nova-backend.rehabha770.workers.dev";
 
 const cn = (...inputs: Array<string | undefined | false>) =>
   twMerge(clsx(inputs));
@@ -18,7 +17,6 @@ type Driver = {
   phone: string | null;
   status: string | null;
   wallet_balance: number | null;
-  photo_url: string | null;
   store_id?: string | null;
 };
 
@@ -518,6 +516,10 @@ export default function DriverPanel() {
 
   const login = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!phone.trim() || !secretCode.trim()) {
+      toast.error("رقم الهاتف وكود السائق مطلوبان");
+      return;
+    }
     const biometricOk = await ensureBiometric();
     if (!biometricOk) return;
     const toastId = toast.loading("جاري تسجيل الدخول...");
@@ -526,7 +528,7 @@ export default function DriverPanel() {
       const res = await fetch(`${API_BASE}/drivers/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone, secret_code: secretCode, driver_code: secretCode }),
+        body: JSON.stringify({ phone: phone.trim(), secret_code: secretCode.trim(), driver_code: secretCode.trim() }),
       });
 
       const data = await res.json();
@@ -535,7 +537,7 @@ export default function DriverPanel() {
         toast.success("مرحباً بعودتك", { id: toastId });
         await registerBiometric(data.driver);
       } else {
-        toast.error(data?.error ?? "فشل تسجيل الدخول", { id: toastId });
+        toast.error("رقم الهاتف وكود السائق مطلوبان");
       }
     } catch {
       toast.error("خطأ في الشبكة", { id: toastId });
@@ -581,7 +583,7 @@ export default function DriverPanel() {
         toast.success("تم تحديث الحالة", { id: toastId });
         await refreshDriver();
       } else {
-        toast.error(data?.error ?? "فشل تحديث الحالة", { id: toastId });
+        toast.error("رقم الهاتف وكود السائق مطلوبان");
       }
     } catch {
       toast.error("خطأ في الشبكة", { id: toastId });
@@ -610,7 +612,7 @@ export default function DriverPanel() {
         toast.success("تم تحديث الحالة", { id: toastId });
         await refreshDriver();
       } else {
-        toast.error(data?.error ?? "فشل التحديث", { id: toastId });
+        toast.error("رقم الهاتف وكود السائق مطلوبان");
       }
     } catch {
       toast.error("خطأ في الشبكة", { id: toastId });
@@ -641,7 +643,7 @@ export default function DriverPanel() {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white">
-                  <Image src="/logo.png" alt="NOVA MAX" width={46} height={46} />
+                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/70 bg-white/80 text-[10px] font-semibold tracking-[0.2em] text-slate-600">NOVA</div>
                 </div>
                 <div className="text-right">
                   <p className="text-xs tracking-[0.25em] text-slate-500">نوفا ماكس</p>
@@ -656,11 +658,17 @@ export default function DriverPanel() {
             <div className="mt-6 text-right">
               <h1 className="text-2xl font-semibold">تسجيل دخول المندوب</h1>
               <p className="mt-2 text-sm text-slate-500">
-                أدخل رقم الهاتف، البريد الإلكتروني، والكود السري من لوحة المتجر.
+                أدخل رقم الهاتف وكود السائق من لوحة المتجر.
               </p>
             </div>
 
             <form onSubmit={login} className="mt-6 grid w-full gap-4">
+              <input
+                className="h-14 rounded-2xl border border-white/70 bg-white/80 px-4 text-base text-slate-900 outline-none focus:border-orange-500/80"
+                placeholder="رقم الهاتف"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+              />
               <input
                 className="h-14 rounded-2xl border border-white/70 bg-white/80 px-4 text-base text-slate-900 outline-none focus:border-orange-500/80"
                 placeholder="كود السائق"
@@ -1252,6 +1260,8 @@ export default function DriverPanel() {
     </div>
   );
 }
+
+
 
 
 
