@@ -734,7 +734,7 @@ export default function DriverPanel() {
               <div className="flex items-center gap-3">
                 <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white">
                   <img
-                    src="/nova-logo.svg"
+                    src="/logo.webp"
                     alt="Nova"
                     className="h-11 w-11 rounded-2xl border border-white/70 bg-white/80"
                   />
@@ -1466,6 +1466,7 @@ export default function DriverPanel() {
     </div>
   );
 }
+
 
 
 
