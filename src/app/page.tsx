@@ -733,7 +733,11 @@ export default function DriverPanel() {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white">
-                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/70 bg-white/80 text-[10px] font-semibold tracking-[0.2em] text-slate-600">NOVA</div>
+                  <img
+                    src="/nova-logo.svg"
+                    alt="Nova"
+                    className="h-11 w-11 rounded-2xl border border-white/70 bg-white/80"
+                  />
                 </div>
                 <div className="text-right">
                   <p className="text-xs tracking-[0.25em] text-slate-500">نوفا ماكس</p>
