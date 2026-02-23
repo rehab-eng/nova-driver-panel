@@ -268,18 +268,26 @@ export default function DriverPanel() {
     flashTimers.current.set(id, timeout);
   };
 
-  const pushNotification = (title: string, description?: string) => {
+  const pushNotification = (
+    title: string,
+    description?: string,
+    key?: string
+  ) => {
     const id =
-      typeof crypto !== "undefined" && "randomUUID" in crypto
+      key ??
+      (typeof crypto !== "undefined" && "randomUUID" in crypto
         ? crypto.randomUUID()
-        : `${Date.now()}-${Math.random()}`;
+        : `${Date.now()}-${Math.random()}`);
     const entry: NotificationItem = {
       id,
       title,
       description,
       created_at: new Date().toISOString(),
     };
-    setNotifications((prev) => [entry, ...prev].slice(0, 20));
+    setNotifications((prev) => {
+      const filtered = prev.filter((item) => item.id !== id);
+      return [entry, ...filtered].slice(0, 20);
+    });
   };
 
   const applyOrders = (nextOrders: Order[], showToasts: boolean) => {
@@ -394,7 +402,11 @@ export default function DriverPanel() {
         if (order.driver_id && order.driver_id !== driver.id) return;
         if (!order.driver_id && isDriverBusy()) return;
         upsertOrder(order);
-        pushNotification("طلب جديد", order.customer_location_text ?? "تم تعيين طلب جديد.");
+        pushNotification(
+          "طلب جديد",
+          order.customer_location_text ?? "تم تعيين طلب جديد.",
+          `order:${order.id}`
+        );
         return;
       }
       if (type === "order_status" && typeof payload.order_id === "string") {
@@ -410,7 +422,8 @@ export default function DriverPanel() {
         if (typeof payload.status === "string") {
           pushNotification(
             "تحديث حالة الطلب",
-            `الحالة الآن: ${formatStatus(payload.status)}`
+            `الحالة الآن: ${formatStatus(payload.status)}`,
+            `order:${payload.order_id}`
           );
         }
         return;
@@ -429,7 +442,8 @@ export default function DriverPanel() {
             "حركة محفظة جديدة",
             `${formatTxType(tx.type)} بقيمة ${
               Number.isFinite(tx.amount) ? tx.amount.toFixed(2) : "-"
-            }`
+            }`,
+            `wallet:${tx.id ?? payload.driver_id}`
           );
         }
         return;
@@ -440,7 +454,11 @@ export default function DriverPanel() {
           typeof payload.status === "string" ? payload.status : null;
         if (nextStatus) {
           setDriver((prev) => (prev ? { ...prev, status: nextStatus } : prev));
-          pushNotification("تحديث الحالة", formatDriverStatus(nextStatus));
+          pushNotification(
+            "تحديث الحالة",
+            formatDriverStatus(nextStatus),
+            "driver:status"
+          );
         }
       }
     };
