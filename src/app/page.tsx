@@ -171,6 +171,18 @@ export default function DriverPanel() {
   useEffect(() => {
     const storedDriver = localStorage.getItem("nova.driver");
     const storedCode = localStorage.getItem("nova.driver_code");
+    const storedPhone = localStorage.getItem("nova.driver_phone");
+    if (storedCode) setSecretCode(storedCode);
+    if (storedPhone) setPhone(storedPhone);
+    if (storedDriver) {
+      try {
+        const parsed = JSON.parse(storedDriver) as Driver;
+        setDriver(parsed);
+        if (!storedPhone && parsed?.phone) setPhone(parsed.phone);
+      } catch {
+        localStorage.removeItem("nova.driver");
+      }
+    }
   }, []);
 
   useEffect(() => {
@@ -180,6 +192,12 @@ export default function DriverPanel() {
   useEffect(() => {
     if (driver) localStorage.setItem("nova.driver", JSON.stringify(driver));
   }, [driver, secretCode]);
+
+  useEffect(() => {
+    if (phone.trim()) {
+      localStorage.setItem("nova.driver_phone", phone.trim());
+    }
+  }, [phone]);
 
   const getBiometricKey = () => {
     if (!phone.trim() || !secretCode.trim()) return null;
@@ -195,6 +213,7 @@ export default function DriverPanel() {
   const logout = () => {
     localStorage.removeItem("nova.driver");
     localStorage.removeItem("nova.driver_code");
+    localStorage.removeItem("nova.driver_phone");
     const key = getBiometricKey();
     if (key) localStorage.removeItem(key);
     setDriver(null);
@@ -284,6 +303,16 @@ export default function DriverPanel() {
 
     ordersRef.current = nextOrders;
     setOrders(nextOrders);
+  };
+
+  const updateOrderLocal = (orderId: string, patch: Partial<Order>) => {
+    const current = ordersRef.current;
+    const idx = current.findIndex((order) => order.id === orderId);
+    if (idx < 0) return;
+    const next = [...current];
+    next[idx] = { ...next[idx], ...patch };
+    ordersRef.current = next;
+    setOrders(next);
   };
 
   useEffect(() => {
@@ -574,7 +603,7 @@ export default function DriverPanel() {
   };
 
   const refreshDriver = async () => {
-    if (!driver) return;
+    if (!driver || !secretCode.trim()) return;
     const res = await fetch(
       `${API_BASE}/drivers/${driver.id}?secret_code=${encodeURIComponent(secretCode)}`
     );
@@ -638,6 +667,7 @@ export default function DriverPanel() {
 
       const data = await res.json();
       if (data?.ok) {
+        updateOrderLocal(orderId, { status, driver_id: driver.id });
         toast.success("تم تحديث الحالة", { id: toastId });
         await refreshDriver();
       } else {
