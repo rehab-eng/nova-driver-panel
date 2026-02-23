@@ -161,6 +161,7 @@ export default function DriverPanel() {
   const [activeSection, setActiveSection] = useState<
     "home" | "orders" | "wallet" | "notifications" | "profile" | "history" | "support"
   >("home");
+  const [ordersTab, setOrdersTab] = useState<"pool" | "special">("pool");
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
 
   const ordersRef = useRef<Order[]>([]);
@@ -295,16 +296,34 @@ export default function DriverPanel() {
 
     const fetchOrders = async (showToasts: boolean) => {
       try {
-        const query = driver.store_id
-          ? `store_id=${encodeURIComponent(driver.store_id)}`
-          : `driver_id=${encodeURIComponent(driver.id)}`;
-        const res = await fetch(`${API_BASE}/orders?${query}`);
-        const data = await res.json();
-        if (active && data?.orders) {
-          const visible = (data.orders as Order[]).filter(
-            (order) => !order.driver_id || order.driver_id === driver.id
+        const [poolRes, driverRes] = await Promise.all([
+          fetch(
+            `${API_BASE}/orders?status=pending&driver_code=${encodeURIComponent(
+              secretCode
+            )}`
+          ),
+          fetch(`${API_BASE}/orders?driver_id=${encodeURIComponent(driver.id)}`),
+        ]);
+
+        const poolData = await poolRes.json();
+        const driverData = await driverRes.json();
+        const poolOrders = Array.isArray(poolData?.orders)
+          ? (poolData.orders as Order[])
+          : [];
+        const driverOrders = Array.isArray(driverData?.orders)
+          ? (driverData.orders as Order[])
+          : [];
+
+        const merged = new Map<string, Order>();
+        for (const order of [...poolOrders, ...driverOrders]) {
+          merged.set(order.id, order);
+        }
+
+        if (active) {
+          applyOrders(
+            Array.from(merged.values()),
+            showToasts && hasLoadedRef.current
           );
-          applyOrders(visible, showToasts && hasLoadedRef.current);
           if (!hasLoadedRef.current) hasLoadedRef.current = true;
         }
       } catch {
@@ -330,11 +349,21 @@ export default function DriverPanel() {
       if (!hasLoadedRef.current) hasLoadedRef.current = true;
     };
 
+    const isDriverBusy = () =>
+      ordersRef.current.some(
+        (order) =>
+          order.driver_id === driver.id &&
+          order.status !== "pending" &&
+          order.status !== "delivered" &&
+          order.status !== "cancelled"
+      );
+
     const handleRealtime = (payload: Record<string, unknown>) => {
       const type = payload.type;
       if (type === "order_created" && payload.order && typeof payload.order === "object") {
         const order = payload.order as Order;
         if (order.driver_id && order.driver_id !== driver.id) return;
+        if (!order.driver_id && isDriverBusy()) return;
         upsertOrder(order);
         pushNotification("طلب جديد", order.customer_location_text ?? "تم تعيين طلب جديد.");
         return;
@@ -619,18 +648,31 @@ export default function DriverPanel() {
     }
   };
 
+  const driverId = driver?.id ?? "";
+  const poolOrders = orders.filter(
+    (order) => order.status === "pending" && !order.driver_id
+  );
+  const directOrders = orders.filter(
+    (order) => order.status === "pending" && order.driver_id === driverId
+  );
   const activeOrders = orders.filter(
-    (order) => order.status !== "delivered" && order.status !== "cancelled"
+    (order) =>
+      order.driver_id === driverId &&
+      order.status !== "pending" &&
+      order.status !== "delivered" &&
+      order.status !== "cancelled"
   );
   const historyOrders = orders.filter(
-    (order) => order.status === "delivered" || order.status === "cancelled"
+    (order) =>
+      order.driver_id === driverId &&
+      (order.status === "delivered" || order.status === "cancelled")
   );
+  const ordersToRender = ordersTab === "pool" ? poolOrders : directOrders;
   const deliveredCount = historyOrders.filter((order) => order.status === "delivered")
     .length;
   const deliveringCount = activeOrders.filter((order) => order.status === "delivering")
     .length;
-  const pendingCount = activeOrders.filter((order) => order.status === "pending")
-    .length;
+  const pendingCount = poolOrders.length + directOrders.length;
   const walletBalance =
     typeof driver?.wallet_balance === "number" ? driver.wallet_balance : 0;
 
@@ -952,7 +994,45 @@ export default function DriverPanel() {
 
         {activeSection === "orders" && (
           <section className="mt-4 space-y-4 pb-8 text-right">
-            {activeOrders.map((order) => (
+            <div className="rounded-[26px] border border-white/70 bg-white/80 p-5 shadow-sm backdrop-blur-xl">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-slate-900">ساحة الطلبات</p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    الطلبات العامة والطلبات الموجهة لك مباشرة.
+                  </p>
+                </div>
+                <ClipboardList className="h-5 w-5 text-slate-500" />
+              </div>
+              <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                <button
+                  type="button"
+                  onClick={() => setOrdersTab("pool")}
+                  className={cn(
+                    "rounded-2xl border px-3 py-2 font-semibold",
+                    ordersTab === "pool"
+                      ? "border-orange-200 bg-orange-100 text-orange-700"
+                      : "border-white/70 bg-white/80 text-slate-600"
+                  )}
+                >
+                  الساحة العامة
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setOrdersTab("special")}
+                  className={cn(
+                    "rounded-2xl border px-3 py-2 font-semibold",
+                    ordersTab === "special"
+                      ? "border-orange-200 bg-orange-100 text-orange-700"
+                      : "border-white/70 bg-white/80 text-slate-600"
+                  )}
+                >
+                  طلبات خاصة
+                </button>
+              </div>
+            </div>
+
+            {ordersToRender.map((order) => (
               <div
                 key={order.id}
                 className={cn(
@@ -1020,42 +1100,116 @@ export default function DriverPanel() {
                       قبول الطلب
                     </button>
                   )}
-                  {order.status === "accepted" && (
-                    <button
-                      className="flex h-12 items-center justify-center gap-2 rounded-2xl bg-indigo-200 text-sm font-semibold text-slate-900 transition hover:bg-indigo-300"
-                      onClick={() => updateStatus(order.id, "delivering")}
-                    >
-                      <Truck className="h-5 w-5" />
-                      بدء التوصيل
-                    </button>
-                  )}
-                  {order.status === "delivering" && (
-                    <button
-                      className="flex h-12 items-center justify-center gap-2 rounded-2xl bg-orange-200 text-sm font-semibold text-slate-900 transition hover:bg-orange-300"
-                      onClick={() => updateStatus(order.id, "delivered")}
-                    >
-                      <Zap className="h-5 w-5" />
-                      تم التسليم
-                    </button>
-                  )}
-                  {order.status !== "delivered" && order.status !== "cancelled" && (
-                    <button
-                      className="flex h-12 items-center justify-center gap-2 rounded-2xl border border-rose-300 bg-rose-50 text-sm font-semibold text-rose-700 transition hover:bg-rose-100"
-                      onClick={() => updateStatus(order.id, "cancelled")}
-                    >
-                      <XCircle className="h-5 w-5" />
-                      إلغاء الطلب
-                    </button>
-                  )}
                 </div>
               </div>
             ))}
 
-            {activeOrders.length === 0 && (
+            {ordersToRender.length === 0 && (
               <div className="rounded-[26px] border border-white/70 bg-white/80 px-6 py-8 text-center text-base text-slate-700">
-                لا توجد طلبات نشطة حالياً.
+                لا توجد طلبات متاحة حالياً.
               </div>
             )}
+
+            <div className="pt-2">
+              <p className="text-sm font-semibold text-slate-900">الطلبات النشطة</p>
+              <div className="mt-4 space-y-4">
+                {activeOrders.map((order) => (
+                  <div
+                    key={order.id}
+                    className={cn(
+                      "rounded-[26px] border border-white/70 bg-white/80 p-5 shadow-[0_16px_36px_-24px_rgba(0,0,0,0.25)] backdrop-blur-xl transition",
+                      flashIds.has(order.id) ? "ring-2 ring-orange-400/70" : ""
+                    )}
+                  >
+                    <div className="flex items-start gap-4">
+                      <div className="flex h-24 w-24 items-center justify-center rounded-2xl border border-white/70 bg-gradient-to-br from-sky-100 via-white to-orange-100">
+                        <MapPin className="h-6 w-6 text-orange-500" />
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <p className="text-lg font-semibold text-slate-900">
+                              {order.customer_name ?? "العميل"}
+                            </p>
+                            <p className="mt-1 text-xs text-slate-500">
+                              المتجر: {order.store_name ?? order.store_code ?? (order.store_id ? `${order.store_id.slice(0, 6)}...` : "-")}
+                            </p>
+                            <p className="mt-1 text-sm text-slate-500">
+                              {order.customer_location_text ?? "الموقع غير محدد"}
+                            </p>
+                          </div>
+                          <span
+                            className={cn(
+                              "inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold",
+                              statusStyles[order.status ?? ""] ??
+                                "border-white/70 text-slate-700"
+                            )}
+                          >
+                            {formatStatus(order.status)}
+                          </span>
+                        </div>
+
+                        <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-slate-600">
+                          <div className="rounded-xl border border-white/70 bg-white/80 px-3 py-2">
+                            <p className="flex items-center gap-1 text-[10px] text-slate-500">
+                              <Clock className="h-3 w-3" />
+                              التوقيت
+                            </p>
+                            <p className="mt-1 text-sm text-slate-900">
+                              {formatTime(order.created_at)}
+                            </p>
+                          </div>
+                          <div className="rounded-xl border border-white/70 bg-white/80 px-3 py-2">
+                            <p className="text-[10px] text-slate-500">رسوم التوصيل</p>
+                            <p className="mt-1 text-sm text-slate-900">
+                              {typeof order.delivery_fee === "number"
+                                ? order.delivery_fee.toFixed(2)
+                                : "-"}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 grid gap-2">
+                      {order.status === "accepted" && (
+                        <button
+                          className="flex h-12 items-center justify-center gap-2 rounded-2xl bg-indigo-200 text-sm font-semibold text-slate-900 transition hover:bg-indigo-300"
+                          onClick={() => updateStatus(order.id, "delivering")}
+                        >
+                          <Truck className="h-5 w-5" />
+                          بدء التوصيل
+                        </button>
+                      )}
+                      {order.status === "delivering" && (
+                        <button
+                          className="flex h-12 items-center justify-center gap-2 rounded-2xl bg-orange-200 text-sm font-semibold text-slate-900 transition hover:bg-orange-300"
+                          onClick={() => updateStatus(order.id, "delivered")}
+                        >
+                          <Zap className="h-5 w-5" />
+                          تم التسليم
+                        </button>
+                      )}
+                      {order.status !== "delivered" && order.status !== "cancelled" && (
+                        <button
+                          className="flex h-12 items-center justify-center gap-2 rounded-2xl border border-rose-300 bg-rose-50 text-sm font-semibold text-rose-700 transition hover:bg-rose-100"
+                          onClick={() => updateStatus(order.id, "cancelled")}
+                        >
+                          <XCircle className="h-5 w-5" />
+                          إلغاء الطلب
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {activeOrders.length === 0 && (
+                <div className="mt-4 rounded-[26px] border border-white/70 bg-white/80 px-6 py-8 text-center text-base text-slate-700">
+                  لا توجد طلبات نشطة حالياً.
+                </div>
+              )}
+            </div>
           </section>
         )}
 
