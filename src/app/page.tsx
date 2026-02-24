@@ -108,6 +108,23 @@ function formatTxType(value: string | null | undefined): string {
   return value;
 }
 
+function formatTxNote(note: string | null | undefined): string {
+  if (!note) return "";
+  let text = note;
+  const idMatch = text.match(
+    /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i
+  );
+  if (idMatch) {
+    const id = idMatch[0];
+    text = text.replace(id, `#${formatOrderNumber(id)}`);
+  }
+  text = text.replace(/order/gi, "طلب");
+  text = text.replace(/delivered/gi, "تم التسليم");
+  text = text.replace(/accepted/gi, "تم القبول");
+  text = text.replace(/cancelled/gi, "تم الإلغاء");
+  return text;
+}
+
 function formatTime(value?: string | null): string {
   if (!value) return "—";
   const date = new Date(value);
@@ -1077,7 +1094,7 @@ export default function DriverPanel() {
                       </p>
                       <p className="mt-1 text-xs text-slate-500">
                         {formatPayout(tx.method)}
-                        {tx.note ? ` · ${tx.note}` : ""}
+                        {tx.note ? ` · ${formatTxNote(tx.note)}` : ""}
                       </p>
                     </div>
                     <p
