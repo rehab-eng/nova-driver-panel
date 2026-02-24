@@ -1167,13 +1167,22 @@ export default function DriverPanel() {
 
                 <div className="mt-4 grid gap-2">
                   {order.status === "pending" && (
-                    <button
-                      className="flex h-12 items-center justify-center gap-2 rounded-2xl bg-orange-500 text-sm font-semibold text-white transition hover:bg-orange-600"
-                      onClick={() => updateStatus(order.id, "accepted")}
-                    >
-                      <CheckCircle2 className="h-5 w-5" />
-                      قبول الطلب
-                    </button>
+                    <>
+                      <button
+                        className="flex h-12 items-center justify-center gap-2 rounded-2xl bg-orange-500 text-sm font-semibold text-white transition hover:bg-orange-600"
+                        onClick={() => updateStatus(order.id, "accepted")}
+                      >
+                        <CheckCircle2 className="h-5 w-5" />
+                        قبول الطلب
+                      </button>
+                      <button
+                        className="flex h-12 items-center justify-center gap-2 rounded-2xl bg-orange-500 text-sm font-semibold text-white transition hover:bg-orange-600"
+                        onClick={() => updateStatus(order.id, "cancelled")}
+                      >
+                        <XCircle className="h-5 w-5" />
+                        رفض الطلب
+                      </button>
+                    </>
                   )}
                 </div>
               </div>
@@ -1369,6 +1378,12 @@ export default function DriverPanel() {
                     <p className="mt-1 text-sm text-slate-500">
                       {order.customer_location_text ?? "الموقع غير محدد"}
                     </p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      المستلم: {order.receiver_name ?? "-"}
+                    </p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      المتجر: {order.store_name ?? order.store_code ?? "-"}
+                    </p>
                   </div>
                   <span
                     className={cn(
@@ -1391,6 +1406,18 @@ export default function DriverPanel() {
                     <p className="text-[10px] text-slate-500">الإجمالي</p>
                     <p className="mt-1 text-sm text-slate-900">
                       {formatOrderTotal(order)}
+                    </p>
+                  </div>
+                  <div className="rounded-xl border border-white/70 bg-white/80 px-3 py-2">
+                    <p className="text-[10px] text-slate-500">نوع الطلب</p>
+                    <p className="mt-1 text-sm text-slate-900">
+                      {order.order_type ?? "-"}
+                    </p>
+                  </div>
+                  <div className="rounded-xl border border-white/70 bg-white/80 px-3 py-2">
+                    <p className="text-[10px] text-slate-500">طريقة الدفع</p>
+                    <p className="mt-1 text-sm text-slate-900">
+                      {formatPayout(order.payout_method)}
                     </p>
                   </div>
                 </div>
