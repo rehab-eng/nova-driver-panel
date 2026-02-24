@@ -119,6 +119,15 @@ function formatOrderNumber(id: string): string {
   return String(numeric % 1_000_000).padStart(6, "0");
 }
 
+function formatOrderTotal(order: Order): string {
+  const hasAmount =
+    typeof order.price === "number" || typeof order.delivery_fee === "number";
+  if (!hasAmount) return "-";
+  const price = typeof order.price === "number" ? order.price : 0;
+  const fee = typeof order.delivery_fee === "number" ? order.delivery_fee : 0;
+  return (price + fee).toFixed(2);
+}
+
 const canUseWebAuthn = () =>
   typeof window !== "undefined" &&
   window.isSecureContext &&
@@ -166,11 +175,11 @@ export default function DriverPanel() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [biometricSupported, setBiometricSupported] = useState(false);
   const [biometricLinked, setBiometricLinked] = useState(false);
-  const [walletUnlocked, setWalletUnlocked] = useState(false);
+  const [walletUnlocked, setWalletUnlocked] = useState(true);
   const [activeSection, setActiveSection] = useState<
     "home" | "orders" | "wallet" | "notifications" | "profile" | "history" | "support"
   >("home");
-  const [ordersTab, setOrdersTab] = useState<"pool" | "special">("pool");
+  const [ordersTab, setOrdersTab] = useState<"pool" | "special">("special");
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
 
   const ordersRef = useRef<Order[]>([]);
@@ -742,7 +751,7 @@ export default function DriverPanel() {
 
   if (!driver) {
     return (
-      <div className="min-h-screen bg-[#eef1f6] text-slate-900 [background-image:radial-gradient(circle_at_top,rgba(255,255,255,0.85),transparent_60%),radial-gradient(circle_at_bottom,rgba(148,163,184,0.25),transparent_60%)]">
+      <div className="min-h-screen bg-gradient-to-br from-sky-100 via-cyan-50 to-orange-100 text-slate-900">
         <Toaster position="top-center" />
         <div className="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center px-5 py-10">
           <div className="rounded-[32px] border border-white/70 bg-white/80 p-6 shadow-[0_30px_80px_-40px_rgba(0,0,0,0.4)] backdrop-blur-2xl">
@@ -756,7 +765,7 @@ export default function DriverPanel() {
                   />
                 </div>
                 <div className="text-right">
-                  <p className="text-xs tracking-[0.25em] text-slate-500">نوفا ماكس</p>
+                  <p className="text-xs tracking-[0.25em] text-slate-500">Nova Max</p>
                   <p className="text-sm font-semibold text-slate-900">واجهة المندوب</p>
                 </div>
               </div>
@@ -801,7 +810,7 @@ export default function DriverPanel() {
   }
 
   return (
-    <div className="min-h-screen bg-[#eef1f6] text-slate-900 [background-image:radial-gradient(circle_at_top,rgba(255,255,255,0.92),transparent_65%),radial-gradient(circle_at_bottom,rgba(148,163,184,0.25),transparent_60%)]">
+    <div className="min-h-screen bg-gradient-to-br from-sky-100 via-cyan-50 to-orange-100 text-slate-900">
       <Toaster position="top-center" />
       {menuOpen && (
         <div className="fixed inset-0 z-50 flex justify-end">
@@ -1147,11 +1156,9 @@ export default function DriverPanel() {
                         </p>
                       </div>
                       <div className="rounded-xl border border-white/70 bg-white/80 px-3 py-2">
-                        <p className="text-[10px] text-slate-500">رسوم التوصيل</p>
+                        <p className="text-[10px] text-slate-500">الإجمالي</p>
                         <p className="mt-1 text-sm text-slate-900">
-                          {typeof order.delivery_fee === "number"
-                            ? order.delivery_fee.toFixed(2)
-                            : "-"}
+                          {formatOrderTotal(order)}
                         </p>
                       </div>
                     </div>
@@ -1161,7 +1168,7 @@ export default function DriverPanel() {
                 <div className="mt-4 grid gap-2">
                   {order.status === "pending" && (
                     <button
-                      className="flex h-12 items-center justify-center gap-2 rounded-2xl bg-sky-200 text-sm font-semibold text-slate-900 transition hover:bg-sky-300"
+                      className="flex h-12 items-center justify-center gap-2 rounded-2xl bg-orange-500 text-sm font-semibold text-white transition hover:bg-orange-600"
                       onClick={() => updateStatus(order.id, "accepted")}
                     >
                       <CheckCircle2 className="h-5 w-5" />
@@ -1228,11 +1235,9 @@ export default function DriverPanel() {
                             </p>
                           </div>
                           <div className="rounded-xl border border-white/70 bg-white/80 px-3 py-2">
-                            <p className="text-[10px] text-slate-500">رسوم التوصيل</p>
+                            <p className="text-[10px] text-slate-500">الإجمالي</p>
                             <p className="mt-1 text-sm text-slate-900">
-                              {typeof order.delivery_fee === "number"
-                                ? order.delivery_fee.toFixed(2)
-                                : "-"}
+                              {formatOrderTotal(order)}
                             </p>
                           </div>
                         </div>
@@ -1242,7 +1247,7 @@ export default function DriverPanel() {
                     <div className="mt-4 grid gap-2">
                       {order.status === "accepted" && (
                         <button
-                          className="flex h-12 items-center justify-center gap-2 rounded-2xl bg-indigo-200 text-sm font-semibold text-slate-900 transition hover:bg-indigo-300"
+                          className="flex h-12 items-center justify-center gap-2 rounded-2xl bg-orange-500 text-sm font-semibold text-white transition hover:bg-orange-600"
                           onClick={() => updateStatus(order.id, "delivering")}
                         >
                           <Truck className="h-5 w-5" />
@@ -1251,7 +1256,7 @@ export default function DriverPanel() {
                       )}
                       {order.status === "delivering" && (
                         <button
-                          className="flex h-12 items-center justify-center gap-2 rounded-2xl bg-orange-200 text-sm font-semibold text-slate-900 transition hover:bg-orange-300"
+                          className="flex h-12 items-center justify-center gap-2 rounded-2xl bg-orange-500 text-sm font-semibold text-white transition hover:bg-orange-600"
                           onClick={() => updateStatus(order.id, "delivered")}
                         >
                           <Zap className="h-5 w-5" />
@@ -1260,7 +1265,7 @@ export default function DriverPanel() {
                       )}
                       {order.status !== "delivered" && order.status !== "cancelled" && (
                         <button
-                          className="flex h-12 items-center justify-center gap-2 rounded-2xl border border-rose-300 bg-rose-50 text-sm font-semibold text-rose-700 transition hover:bg-rose-100"
+                          className="flex h-12 items-center justify-center gap-2 rounded-2xl bg-orange-500 text-sm font-semibold text-white transition hover:bg-orange-600"
                           onClick={() => updateStatus(order.id, "cancelled")}
                         >
                           <XCircle className="h-5 w-5" />
@@ -1383,11 +1388,9 @@ export default function DriverPanel() {
                     </p>
                   </div>
                   <div className="rounded-xl border border-white/70 bg-white/80 px-3 py-2">
-                    <p className="text-[10px] text-slate-500">رسوم التوصيل</p>
+                    <p className="text-[10px] text-slate-500">الإجمالي</p>
                     <p className="mt-1 text-sm text-slate-900">
-                      {typeof order.delivery_fee === "number"
-                        ? order.delivery_fee.toFixed(2)
-                        : "-"}
+                      {formatOrderTotal(order)}
                     </p>
                   </div>
                 </div>
