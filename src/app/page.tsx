@@ -176,6 +176,7 @@ export default function DriverPanel() {
   const ordersRef = useRef<Order[]>([]);
   const hasLoadedRef = useRef(false);
   const flashTimers = useRef<Map<string, number>>(new Map());
+  const lastDriverStatusRef = useRef<string | null>(null);
 
   useEffect(() => {
     const storedDriver = localStorage.getItem("nova.driver");
@@ -201,6 +202,10 @@ export default function DriverPanel() {
   useEffect(() => {
     if (driver) localStorage.setItem("nova.driver", JSON.stringify(driver));
   }, [driver, secretCode]);
+
+  useEffect(() => {
+    if (driver?.status) lastDriverStatusRef.current = driver.status;
+  }, [driver?.status]);
 
   useEffect(() => {
     if (phone.trim()) {
@@ -461,14 +466,15 @@ export default function DriverPanel() {
         if (payload.driver_id !== driver.id) return;
         const nextStatus =
           typeof payload.status === "string" ? payload.status : null;
-        if (nextStatus) {
-          setDriver((prev) => (prev ? { ...prev, status: nextStatus } : prev));
-          pushNotification(
-            "تحديث الحالة",
-            formatDriverStatus(nextStatus),
-            "driver:status"
-          );
-        }
+        if (!nextStatus) return;
+        if (lastDriverStatusRef.current === nextStatus) return;
+        lastDriverStatusRef.current = nextStatus;
+        setDriver((prev) => (prev ? { ...prev, status: nextStatus } : prev));
+        pushNotification(
+          "تحديث الحالة",
+          formatDriverStatus(nextStatus),
+          "driver:status"
+        );
       }
     };
 
@@ -665,6 +671,7 @@ export default function DriverPanel() {
       });
       const data = await res.json();
       if (data?.ok) {
+        lastDriverStatusRef.current = nextStatus;
         toast.success("تم تحديث الحالة", { id: toastId });
         await refreshDriver();
       } else {
