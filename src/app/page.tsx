@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Toaster, toast } from "react-hot-toast";
 import { clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
@@ -37,6 +37,11 @@ type Order = {
   created_at?: string | null;
 };
 
+type DeclinedOrder = Order & {
+  declined_at: string;
+  status: "declined";
+};
+
 type WalletTx = {
   id: string;
   amount: number;
@@ -59,6 +64,7 @@ const statusStyles: Record<string, string> = {
   delivering: "bg-orange-50 text-orange-700 border-orange-200",
   delivered: "bg-emerald-50 text-emerald-700 border-emerald-200",
   cancelled: "bg-rose-50 text-rose-700 border-rose-200",
+  declined: "bg-slate-100 text-slate-600 border-slate-200",
 };
 
 const statusLabels: Record<string, string> = {
@@ -67,6 +73,7 @@ const statusLabels: Record<string, string> = {
   delivering: "قيد التوصيل",
   delivered: "تم التسليم",
   cancelled: "ملغي",
+  declined: "مرفوض",
 };
 
 function formatStatus(value: string | null | undefined): string {
@@ -85,10 +92,8 @@ function formatDriverStatus(value: string | null | undefined): string {
 }
 
 const payoutLabels: Record<string, string> = {
-  card: "بطاقة مصرفية",
-  wallet: "محفظة محلية",
-  cash: "نقداً",
-  bank_transfer: "حوالة مصرفية",
+  wallet: "محفظة",
+  cash: "كاش",
 };
 
 function formatPayout(value: string | null | undefined): string {
@@ -128,35 +133,6 @@ function formatOrderTotal(order: Order): string {
   return (price + fee).toFixed(2);
 }
 
-const canUseWebAuthn = () =>
-  typeof window !== "undefined" &&
-  window.isSecureContext &&
-  "PublicKeyCredential" in window;
-
-const bufferToBase64Url = (buffer: ArrayBuffer) => {
-  const bytes = new Uint8Array(buffer);
-  let binary = "";
-  bytes.forEach((b) => {
-    binary += String.fromCharCode(b);
-  });
-  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-};
-
-const base64UrlToBuffer = (base64Url: string) => {
-  const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
-  const padded = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), "=");
-  const binary = atob(padded);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
-  return bytes.buffer;
-};
-
-const randomChallenge = (size = 32) => {
-  const bytes = new Uint8Array(size);
-  crypto.getRandomValues(bytes);
-  return bytes;
-};
-
 function buildWsUrl(path: string, params: Record<string, string>): string {
   const url = new URL(API_BASE);
   url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
@@ -173,19 +149,21 @@ export default function DriverPanel() {
   const [transactions, setTransactions] = useState<WalletTx[]>([]);
   const [flashIds, setFlashIds] = useState<Set<string>>(new Set());
   const [menuOpen, setMenuOpen] = useState(false);
-  const [biometricSupported, setBiometricSupported] = useState(false);
-  const [biometricLinked, setBiometricLinked] = useState(false);
-  const [walletUnlocked, setWalletUnlocked] = useState(true);
   const [activeSection, setActiveSection] = useState<
     "home" | "orders" | "wallet" | "notifications" | "profile" | "history" | "support"
   >("home");
-  const [ordersTab, setOrdersTab] = useState<"pool" | "special">("special");
+  const [ordersTab, setOrdersTab] = useState<"pool" | "special">("pool");
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [orderActionIds, setOrderActionIds] = useState<Record<string, boolean>>({});
+  const [declinedHistory, setDeclinedHistory] = useState<DeclinedOrder[]>([]);
 
   const ordersRef = useRef<Order[]>([]);
   const hasLoadedRef = useRef(false);
   const flashTimers = useRef<Map<string, number>>(new Map());
   const lastDriverStatusRef = useRef<string | null>(null);
+  const declinedOrdersRef = useRef<Set<string>>(new Set());
+  const declinedHistoryRef = useRef<DeclinedOrder[]>([]);
+  const orderEventTsRef = useRef<Map<string, number>>(new Map());
 
   useEffect(() => {
     const storedDriver = localStorage.getItem("nova.driver");
@@ -204,17 +182,45 @@ export default function DriverPanel() {
     }
   }, []);
 
-  useEffect(() => {
-    setBiometricSupported(canUseWebAuthn());
-  }, []);
 
   useEffect(() => {
     if (driver) localStorage.setItem("nova.driver", JSON.stringify(driver));
-  }, [driver, secretCode]);
+  }, [driver]);
 
   useEffect(() => {
     if (driver?.status) lastDriverStatusRef.current = driver.status;
   }, [driver?.status]);
+
+  useEffect(() => {
+    if (!driver?.id) return;
+    const key = `nova.driver.declined.${driver.id}`;
+    try {
+      const stored = localStorage.getItem(key);
+      const parsed = stored ? (JSON.parse(stored) as string[]) : [];
+      declinedOrdersRef.current = new Set(parsed);
+    } catch {
+      declinedOrdersRef.current = new Set();
+    }
+  }, [driver?.id]);
+
+  useEffect(() => {
+    if (!driver?.id) return;
+    const key = `nova.driver.declined.history.${driver.id}`;
+    try {
+      const stored = localStorage.getItem(key);
+      const parsed = stored ? (JSON.parse(stored) as DeclinedOrder[]) : [];
+      if (Array.isArray(parsed)) {
+        declinedHistoryRef.current = parsed;
+        setDeclinedHistory(parsed);
+      } else {
+        declinedHistoryRef.current = [];
+        setDeclinedHistory([]);
+      }
+    } catch {
+      declinedHistoryRef.current = [];
+      setDeclinedHistory([]);
+    }
+  }, [driver?.id]);
 
   useEffect(() => {
     if (phone.trim()) {
@@ -222,27 +228,13 @@ export default function DriverPanel() {
     }
   }, [phone]);
 
-  const getBiometricKey = () => {
-    if (!phone.trim() || !secretCode.trim()) return null;
-    return `nova.webauthn.${phone.trim()}.${secretCode.trim()}`;
-  };
-
-  useEffect(() => {
-    const key = getBiometricKey();
-    if (!key) return;
-    setBiometricLinked(!!localStorage.getItem(key));
-  }, [phone, secretCode, driver]);
-
   const logout = () => {
     localStorage.removeItem("nova.driver");
     localStorage.removeItem("nova.driver_code");
     localStorage.removeItem("nova.driver_phone");
-    const key = getBiometricKey();
-    if (key) localStorage.removeItem(key);
     setDriver(null);
     setSecretCode("");
     setActiveSection("home");
-    setWalletUnlocked(false);
     window.location.reload();
   };
 
@@ -256,11 +248,6 @@ export default function DriverPanel() {
       | "history"
       | "support"
   ) => {
-    if (section === "wallet") {
-      const biometricOk = await ensureBiometric();
-      if (!biometricOk) return;
-      setWalletUnlocked(true);
-    }
     setActiveSection(section);
     setMenuOpen(false);
   };
@@ -268,6 +255,76 @@ export default function DriverPanel() {
   useEffect(() => {
     localStorage.setItem("nova.driver_code", secretCode);
   }, [secretCode]);
+
+  const setOrderBusy = (orderId: string, busy: boolean) => {
+    setOrderActionIds((prev) => {
+      if (prev[orderId] === busy) return prev;
+      return { ...prev, [orderId]: busy };
+    });
+  };
+
+  const persistDeclines = (driverId: string) => {
+    const key = `nova.driver.declined.${driverId}`;
+    localStorage.setItem(key, JSON.stringify(Array.from(declinedOrdersRef.current)));
+  };
+
+  const persistDeclinedHistory = (driverId: string, next: DeclinedOrder[]) => {
+    const key = `nova.driver.declined.history.${driverId}`;
+    localStorage.setItem(key, JSON.stringify(next.slice(0, 80)));
+  };
+
+  const recordDecline = (order: Order) => {
+    if (!driver) return;
+    const entry: DeclinedOrder = {
+      ...order,
+      status: "declined",
+      declined_at: new Date().toISOString(),
+    };
+    setDeclinedHistory((prev) => {
+      const filtered = prev.filter((item) => item.id !== order.id);
+      const next = [entry, ...filtered].slice(0, 80);
+      declinedHistoryRef.current = next;
+      persistDeclinedHistory(driver.id, next);
+      return next;
+    });
+  };
+
+  const markDeclined = (orderId: string) => {
+    if (!driver) return;
+    declinedOrdersRef.current.add(orderId);
+    persistDeclines(driver.id);
+    setOrders((prev) => {
+      const next = prev.filter((order) => order.id !== orderId);
+      ordersRef.current = next;
+      return next;
+    });
+  };
+
+  const allowOrderForDriver = (order: Order) => {
+    if (!driver) return false;
+    if (order.status === "pending") {
+      if (order.driver_id && order.driver_id !== driver.id) return false;
+      if (!order.driver_id && declinedOrdersRef.current.has(order.id)) return false;
+      return true;
+    }
+    if (order.driver_id && order.driver_id !== driver.id) return false;
+    return true;
+  };
+
+  const shouldApplyOrderEvent = (orderId: string, ts?: unknown) => {
+    if (!ts) return true;
+    const parsed =
+      typeof ts === "number"
+        ? ts
+        : typeof ts === "string"
+          ? Date.parse(ts)
+          : NaN;
+    if (!Number.isFinite(parsed)) return true;
+    const last = orderEventTsRef.current.get(orderId) ?? 0;
+    if (parsed <= last) return false;
+    orderEventTsRef.current.set(orderId, parsed);
+    return true;
+  };
 
   const flashOrder = (id: string) => {
     setFlashIds((prev) => {
@@ -332,8 +389,21 @@ export default function DriverPanel() {
       }
     }
 
-    ordersRef.current = nextOrders;
-    setOrders(nextOrders);
+    let declinedChanged = false;
+    if (driver) {
+      for (const order of nextOrders) {
+        if (order.status !== "pending" || order.driver_id === driver.id) {
+          if (declinedOrdersRef.current.delete(order.id)) {
+            declinedChanged = true;
+          }
+        }
+      }
+      if (declinedChanged) persistDeclines(driver.id);
+    }
+
+    const filtered = nextOrders.filter(allowOrderForDriver);
+    ordersRef.current = filtered;
+    setOrders(filtered);
   };
 
   const updateOrderLocal = (orderId: string, patch: Partial<Order>) => {
@@ -342,19 +412,14 @@ export default function DriverPanel() {
     if (idx < 0) return;
     const next = [...current];
     next[idx] = { ...next[idx], ...patch };
-    ordersRef.current = next;
-    setOrders(next);
+    const filtered = next.filter(allowOrderForDriver);
+    ordersRef.current = filtered;
+    setOrders(filtered);
   };
 
-  useEffect(() => {
-    if (!driver) return;
-    let active = true;
-    let socket: WebSocket | null = null;
-    let pingTimer: number | null = null;
-    let reconnectTimer: number | null = null;
-    let retry = 0;
-
-    const fetchOrders = async (showToasts: boolean) => {
+  const fetchOrders = useCallback(
+    async (showToasts: boolean) => {
+      if (!driver) return;
       try {
         const [poolRes, driverRes] = await Promise.all([
           fetch(
@@ -379,16 +444,28 @@ export default function DriverPanel() {
           merged.set(order.id, order);
         }
 
-        if (active) {
-          applyOrders(
-            Array.from(merged.values()),
-            showToasts && hasLoadedRef.current
-          );
-          if (!hasLoadedRef.current) hasLoadedRef.current = true;
-        }
+        applyOrders(
+          Array.from(merged.values()),
+          showToasts && hasLoadedRef.current
+        );
+        if (!hasLoadedRef.current) hasLoadedRef.current = true;
       } catch {
         if (showToasts) toast.error("تعذر تحميل الطلبات");
       }
+    },
+    [driver, secretCode]
+  );
+
+  useEffect(() => {
+    if (!driver) return;
+    let active = true;
+    let socket: WebSocket | null = null;
+    let pingTimer: number | null = null;
+    let reconnectTimer: number | null = null;
+    let retry = 0;
+    const safeFetchOrders = (showToasts: boolean) => {
+      if (!active) return;
+      void fetchOrders(showToasts);
     };
 
     const upsertOrder = (
@@ -422,6 +499,7 @@ export default function DriverPanel() {
       const type = payload.type;
       if (type === "order_created" && payload.order && typeof payload.order === "object") {
         const order = payload.order as Order;
+        if (!shouldApplyOrderEvent(order.id, (payload as { ts?: unknown }).ts)) return;
         if (order.driver_id && order.driver_id !== driver.id) return;
         if (!order.driver_id && isDriverBusy()) return;
         upsertOrder(order);
@@ -433,6 +511,8 @@ export default function DriverPanel() {
         return;
       }
       if (type === "order_status" && typeof payload.order_id === "string") {
+        if (!shouldApplyOrderEvent(payload.order_id, (payload as { ts?: unknown }).ts))
+          return;
         upsertOrder(
           {
             id: payload.order_id,
@@ -530,11 +610,11 @@ export default function DriverPanel() {
     };
 
     startSocket();
-    fetchOrders(false);
+    safeFetchOrders(false);
 
     const poll = window.setInterval(() => {
       if (!socket || socket.readyState !== WebSocket.OPEN) {
-        fetchOrders(true);
+        safeFetchOrders(true);
       }
     }, 6000);
 
@@ -552,76 +632,12 @@ export default function DriverPanel() {
     fetchTransactions();
   }, [driver, secretCode]);
 
-  const ensureBiometric = async () => {
-    if (!canUseWebAuthn()) return true;
-    const key = getBiometricKey();
-    if (!key) return true;
-    const stored = localStorage.getItem(key);
-    if (!stored) return true;
-    try {
-      await navigator.credentials.get({
-        publicKey: {
-          challenge: randomChallenge(),
-          timeout: 60000,
-          userVerification: "required",
-          allowCredentials: [
-            {
-              id: base64UrlToBuffer(stored),
-              type: "public-key",
-            },
-          ],
-        },
-      });
-      return true;
-    } catch {
-      toast.error("فشل التحقق بالبصمة، حاول مرة أخرى.");
-      return false;
-    }
-  };
-
-  const registerBiometric = async (driverInfo: Driver) => {
-    if (!canUseWebAuthn()) return;
-    const key = getBiometricKey();
-    if (!key || localStorage.getItem(key)) return;
-    try {
-      const userId = new TextEncoder().encode(driverInfo.id);
-      const credential = (await navigator.credentials.create({
-        publicKey: {
-          challenge: randomChallenge(),
-          rp: { name: "Nova Max WS" },
-          user: {
-            id: userId,
-            name: driverInfo.phone ?? phone ?? "driver",
-            displayName: driverInfo.name ?? "Driver",
-          },
-          pubKeyCredParams: [
-            { type: "public-key", alg: -7 },
-            { type: "public-key", alg: -257 },
-          ],
-          authenticatorSelection: {
-            residentKey: "preferred",
-            userVerification: "required",
-          },
-          timeout: 60000,
-        },
-      })) as PublicKeyCredential | null;
-      if (credential?.rawId) {
-        localStorage.setItem(key, bufferToBase64Url(credential.rawId));
-        setBiometricLinked(true);
-      }
-    } catch {
-      // ignore biometric registration failures
-    }
-  };
-
   const login = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!phone.trim() || !secretCode.trim()) {
       toast.error("رقم الهاتف وكود السائق مطلوبان");
       return;
     }
-    const biometricOk = await ensureBiometric();
-    if (!biometricOk) return;
     const toastId = toast.loading("جاري تسجيل الدخول...");
 
     try {
@@ -635,7 +651,6 @@ export default function DriverPanel() {
       if (data?.driver?.id) {
         setDriver(data.driver);
         toast.success("مرحباً بعودتك", { id: toastId });
-        await registerBiometric(data.driver);
       } else {
         toast.error("رقم الهاتف وكود السائق مطلوبان");
       }
@@ -693,8 +708,10 @@ export default function DriverPanel() {
 
   const updateStatus = async (orderId: string, status: string) => {
     if (!driver) return;
+    if (orderActionIds[orderId]) return;
 
     const toastId = toast.loading("جاري تحديث الحالة...");
+    setOrderBusy(orderId, true);
 
     try {
       const res = await fetch(`${API_BASE}/orders/${orderId}/status`, {
@@ -713,11 +730,51 @@ export default function DriverPanel() {
         updateOrderLocal(orderId, { status, driver_id: driver.id });
         toast.success("تم تحديث الحالة", { id: toastId });
         await refreshDriver();
+        await fetchOrders(true);
       } else {
-        toast.error("رقم الهاتف وكود السائق مطلوبان");
+        toast.error(data?.error ?? "تعذر تحديث الطلب");
       }
     } catch {
       toast.error("خطأ في الشبكة", { id: toastId });
+    } finally {
+      setOrderBusy(orderId, false);
+    }
+  };
+
+  const declineOrder = async (order: Order) => {
+    if (!driver) return;
+    if (orderActionIds[order.id]) return;
+    const toastId = toast.loading("جاري رفض الطلب...");
+    setOrderBusy(order.id, true);
+    try {
+      if (!order.driver_id) {
+        markDeclined(order.id);
+        recordDecline(order);
+        toast.success("تم إخفاء الطلب", { id: toastId });
+        return;
+      }
+      const res = await fetch(`${API_BASE}/orders/${order.id}/decline`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Driver-Code": secretCode },
+        body: JSON.stringify({
+          driver_id: driver.id,
+          secret_code: secretCode,
+          driver_code: secretCode,
+        }),
+      });
+      const data = await res.json();
+      if (data?.ok) {
+        markDeclined(order.id);
+        recordDecline(order);
+        toast.success("تم رفض الطلب", { id: toastId });
+        await fetchOrders(true);
+      } else {
+        toast.error(data?.error ?? "تعذر رفض الطلب", { id: toastId });
+      }
+    } catch {
+      toast.error("خطأ في الشبكة", { id: toastId });
+    } finally {
+      setOrderBusy(order.id, false);
     }
   };
 
@@ -740,6 +797,14 @@ export default function DriverPanel() {
       order.driver_id === driverId &&
       (order.status === "delivered" || order.status === "cancelled")
   );
+  const declinedEntries = declinedHistory.filter(
+    (order) => order.driver_id === driverId || !order.driver_id
+  );
+  const historyEntries = [...historyOrders, ...declinedEntries].sort((a, b) => {
+    const aTime = (a as DeclinedOrder).declined_at ?? a.created_at ?? "";
+    const bTime = (b as DeclinedOrder).declined_at ?? b.created_at ?? "";
+    return Date.parse(bTime) - Date.parse(aTime);
+  });
   const ordersToRender = ordersTab === "pool" ? poolOrders : directOrders;
   const deliveredCount = historyOrders.filter((order) => order.status === "delivered")
     .length;
@@ -798,11 +863,9 @@ export default function DriverPanel() {
                 دخول لوحة السائق
               </button>
             </form>
-            {biometricSupported && (
-              <p className="mt-4 text-xs text-slate-500">
-                سيتم طلب التحقق بالبصمة أو الوجه عند كل تسجيل دخول.
-              </p>
-            )}
+            <p className="mt-4 text-xs text-slate-500">
+              البيانات تُحمّل مباشرة بعد تسجيل الدخول.
+            </p>
           </div>
         </div>
       </div>
@@ -871,18 +934,6 @@ export default function DriverPanel() {
               <div className="mt-3 flex items-center justify-between">
                 <span className="text-slate-600">الكود السري</span>
                 <span className="font-semibold text-slate-900">{secretCode || "-"}</span>
-              </div>
-              <div className="mt-2 flex items-center justify-between">
-                <span className="text-slate-600">البصمة</span>
-                <span
-                  className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
-                    biometricLinked
-                      ? "bg-emerald-100 text-emerald-700"
-                      : "bg-slate-200 text-slate-600"
-                  }`}
-                >
-                  {biometricLinked ? "مفعل" : "غير مفعل"}
-                </span>
               </div>
             </div>
 
@@ -988,84 +1039,61 @@ export default function DriverPanel() {
 
         {activeSection === "wallet" && (
           <section className="mt-4 space-y-4 pb-8 text-right">
-            {!walletUnlocked ? (
-              <div className="rounded-[26px] border border-white/70 bg-white/80 p-6 text-center shadow-sm backdrop-blur-xl">
+            <div className="rounded-[26px] border border-white/70 bg-white/80 p-5 shadow-[0_16px_36px_-24px_rgba(0,0,0,0.25)] backdrop-blur-xl">
+              <p className="text-xs text-slate-500">رصيد المحفظة الحالي</p>
+              <p className="mt-3 text-3xl font-semibold text-slate-900">
+                {walletBalance.toFixed(2)}
+              </p>
+              <p className="mt-1 text-xs text-slate-500">آخر خمس حركات مالية</p>
+            </div>
+
+            <div className="rounded-[26px] border border-white/70 bg-white/80 p-4 shadow-sm backdrop-blur-xl">
+              <div className="flex items-center justify-between">
                 <p className="text-sm font-semibold text-slate-900">
-                  التحقق قبل عرض المحفظة
-                </p>
-                <p className="mt-2 text-xs text-slate-500">
-                  نحتاج تأكيد البصمة قبل إظهار البيانات المالية.
+                  الحركات المالية الأخيرة
                 </p>
                 <button
                   type="button"
-                  onClick={async () => {
-                    const ok = await ensureBiometric();
-                    if (ok) setWalletUnlocked(true);
-                  }}
-                  className="mt-4 h-11 rounded-2xl bg-gradient-to-l from-orange-500 to-amber-400 px-5 text-sm font-semibold text-white shadow-lg shadow-orange-500/30"
+                  onClick={fetchTransactions}
+                  className="text-xs text-slate-600"
                 >
-                  تأكيد الهوية
+                  تحديث
                 </button>
               </div>
-            ) : (
-              <>
-                <div className="rounded-[26px] border border-white/70 bg-white/80 p-5 shadow-[0_16px_36px_-24px_rgba(0,0,0,0.25)] backdrop-blur-xl">
-                  <p className="text-xs text-slate-500">رصيد المحفظة الحالي</p>
-                  <p className="mt-3 text-3xl font-semibold text-slate-900">
-                    {walletBalance.toFixed(2)}
-                  </p>
-                  <p className="mt-1 text-xs text-slate-500">آخر خمس حركات مالية</p>
-                </div>
-
-                <div className="rounded-[26px] border border-white/70 bg-white/80 p-4 shadow-sm backdrop-blur-xl">
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm font-semibold text-slate-900">
-                      الحركات المالية الأخيرة
-                    </p>
-                    <button
-                      type="button"
-                      onClick={fetchTransactions}
-                      className="text-xs text-slate-600"
+              <div className="mt-3 space-y-2 text-sm">
+                {transactions.length === 0 && (
+                  <div className="rounded-2xl border border-white/70 bg-white/80 px-4 py-3 text-center text-slate-500">
+                    لا توجد حركات بعد.
+                  </div>
+                )}
+                {transactions.map((tx) => (
+                  <div
+                    key={tx.id}
+                    className="flex items-center justify-between rounded-2xl border border-white/70 bg-white/80 px-4 py-3"
+                  >
+                    <div>
+                      <p className="text-sm font-semibold text-slate-900">
+                        {formatTxType(tx.type)}
+                      </p>
+                      <p className="mt-1 text-xs text-slate-500">
+                        {formatPayout(tx.method)}
+                        {tx.note ? ` · ${tx.note}` : ""}
+                      </p>
+                    </div>
+                    <p
+                      className={`text-sm font-semibold ${
+                        tx.type === "credit"
+                          ? "text-emerald-600"
+                          : "text-rose-600"
+                      }`}
                     >
-                      تحديث
-                    </button>
+                      {tx.type === "debit" ? "-" : "+"}
+                      {Number.isFinite(tx.amount) ? tx.amount.toFixed(2) : "-"}
+                    </p>
                   </div>
-                  <div className="mt-3 space-y-2 text-sm">
-                    {transactions.length === 0 && (
-                      <div className="rounded-2xl border border-white/70 bg-white/80 px-4 py-3 text-center text-slate-500">
-                        لا توجد حركات بعد.
-                      </div>
-                    )}
-                    {transactions.map((tx) => (
-                      <div
-                        key={tx.id}
-                        className="flex items-center justify-between rounded-2xl border border-white/70 bg-white/80 px-4 py-3"
-                      >
-                        <div>
-                          <p className="text-sm font-semibold text-slate-900">
-                            {formatTxType(tx.type)}
-                          </p>
-                          <p className="mt-1 text-xs text-slate-500">
-                            {formatPayout(tx.method)}
-                            {tx.note ? ` · ${tx.note}` : ""}
-                          </p>
-                        </div>
-                        <p
-                          className={`text-sm font-semibold ${
-                            tx.type === "credit"
-                              ? "text-emerald-600"
-                              : "text-rose-600"
-                          }`}
-                        >
-                          {tx.type === "debit" ? "-" : "+"}
-                          {Number.isFinite(tx.amount) ? tx.amount.toFixed(2) : "-"}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </>
-            )}
+                ))}
+              </div>
+            </div>
           </section>
         )}
 
@@ -1127,6 +1155,9 @@ export default function DriverPanel() {
                         <p className="text-lg font-semibold text-slate-900">
                           {order.customer_name ?? "العميل"}
                         </p>
+                        <p className="mt-1 text-xs text-slate-400">
+                          #{formatOrderNumber(order.id)}
+                        </p>
                         <p className="mt-1 text-xs text-slate-500">
                           المتجر: {order.store_name ?? order.store_code ?? (order.store_id ? `${order.store_id.slice(0, 6)}...` : "-")}
                         </p>
@@ -1169,15 +1200,21 @@ export default function DriverPanel() {
                   {order.status === "pending" && (
                     <>
                       <button
-                        className="flex h-12 items-center justify-center gap-2 rounded-2xl bg-orange-500 text-sm font-semibold text-white transition hover:bg-orange-600"
+                        className={`flex h-12 items-center justify-center gap-2 rounded-2xl bg-orange-500 text-sm font-semibold text-white transition hover:bg-orange-600 ${
+                          orderActionIds[order.id] ? "cursor-not-allowed opacity-60" : ""
+                        }`}
                         onClick={() => updateStatus(order.id, "accepted")}
+                        disabled={orderActionIds[order.id]}
                       >
                         <CheckCircle2 className="h-5 w-5" />
                         قبول الطلب
                       </button>
                       <button
-                        className="flex h-12 items-center justify-center gap-2 rounded-2xl bg-orange-500 text-sm font-semibold text-white transition hover:bg-orange-600"
-                        onClick={() => updateStatus(order.id, "cancelled")}
+                        className={`flex h-12 items-center justify-center gap-2 rounded-2xl bg-orange-500 text-sm font-semibold text-white transition hover:bg-orange-600 ${
+                          orderActionIds[order.id] ? "cursor-not-allowed opacity-60" : ""
+                        }`}
+                        onClick={() => declineOrder(order)}
+                        disabled={orderActionIds[order.id]}
                       >
                         <XCircle className="h-5 w-5" />
                         رفض الطلب
@@ -1214,6 +1251,9 @@ export default function DriverPanel() {
                           <div>
                             <p className="text-lg font-semibold text-slate-900">
                               {order.customer_name ?? "العميل"}
+                            </p>
+                            <p className="mt-1 text-xs text-slate-400">
+                              #{formatOrderNumber(order.id)}
                             </p>
                             <p className="mt-1 text-xs text-slate-500">
                               المتجر: {order.store_name ?? order.store_code ?? (order.store_id ? `${order.store_id.slice(0, 6)}...` : "-")}
@@ -1256,8 +1296,11 @@ export default function DriverPanel() {
                     <div className="mt-4 grid gap-2">
                       {order.status === "accepted" && (
                         <button
-                          className="flex h-12 items-center justify-center gap-2 rounded-2xl bg-orange-500 text-sm font-semibold text-white transition hover:bg-orange-600"
+                          className={`flex h-12 items-center justify-center gap-2 rounded-2xl bg-orange-500 text-sm font-semibold text-white transition hover:bg-orange-600 ${
+                            orderActionIds[order.id] ? "cursor-not-allowed opacity-60" : ""
+                          }`}
                           onClick={() => updateStatus(order.id, "delivering")}
+                          disabled={orderActionIds[order.id]}
                         >
                           <Truck className="h-5 w-5" />
                           بدء التوصيل
@@ -1265,8 +1308,11 @@ export default function DriverPanel() {
                       )}
                       {order.status === "delivering" && (
                         <button
-                          className="flex h-12 items-center justify-center gap-2 rounded-2xl bg-orange-500 text-sm font-semibold text-white transition hover:bg-orange-600"
+                          className={`flex h-12 items-center justify-center gap-2 rounded-2xl bg-orange-500 text-sm font-semibold text-white transition hover:bg-orange-600 ${
+                            orderActionIds[order.id] ? "cursor-not-allowed opacity-60" : ""
+                          }`}
                           onClick={() => updateStatus(order.id, "delivered")}
+                          disabled={orderActionIds[order.id]}
                         >
                           <Zap className="h-5 w-5" />
                           تم التسليم
@@ -1274,8 +1320,11 @@ export default function DriverPanel() {
                       )}
                       {order.status !== "delivered" && order.status !== "cancelled" && (
                         <button
-                          className="flex h-12 items-center justify-center gap-2 rounded-2xl bg-orange-500 text-sm font-semibold text-white transition hover:bg-orange-600"
+                          className={`flex h-12 items-center justify-center gap-2 rounded-2xl bg-orange-500 text-sm font-semibold text-white transition hover:bg-orange-600 ${
+                            orderActionIds[order.id] ? "cursor-not-allowed opacity-60" : ""
+                          }`}
                           onClick={() => updateStatus(order.id, "cancelled")}
+                          disabled={orderActionIds[order.id]}
                         >
                           <XCircle className="h-5 w-5" />
                           إلغاء الطلب
@@ -1343,16 +1392,6 @@ export default function DriverPanel() {
                     {formatDriverStatus(driver.status)}
                   </p>
                 </div>
-                <div className="rounded-2xl border border-white/70 bg-white/80 px-4 py-3">
-                  <p className="text-xs tracking-[0.2em] text-slate-500">البصمة</p>
-                  <p className="mt-1 text-sm font-semibold text-slate-900">
-                    {biometricSupported
-                      ? biometricLinked
-                        ? "مفعلة"
-                        : "غير مفعلة"
-                      : "غير مدعومة"}
-                  </p>
-                </div>
               </div>
             </div>
           </section>
@@ -1360,12 +1399,12 @@ export default function DriverPanel() {
 
         {activeSection === "history" && (
           <section className="mt-4 space-y-4 pb-8 text-right">
-            {historyOrders.length === 0 && (
+            {historyEntries.length === 0 && (
               <div className="rounded-[26px] border border-white/70 bg-white/80 px-6 py-8 text-center text-base text-slate-700">
                 لا يوجد سجل طلبات بعد.
               </div>
             )}
-            {historyOrders.map((order) => (
+            {historyEntries.map((order) => (
               <div
                 key={order.id}
                 className="rounded-[26px] border border-white/70 bg-white/80 p-5 shadow-sm backdrop-blur-xl"
@@ -1374,6 +1413,9 @@ export default function DriverPanel() {
                   <div>
                     <p className="text-base font-semibold text-slate-900">
                       {order.customer_name ?? "العميل"}
+                    </p>
+                    <p className="mt-1 text-xs text-slate-400">
+                      #{formatOrderNumber(order.id)}
                     </p>
                     <p className="mt-1 text-sm text-slate-500">
                       {order.customer_location_text ?? "الموقع غير محدد"}
@@ -1399,7 +1441,7 @@ export default function DriverPanel() {
                   <div className="rounded-xl border border-white/70 bg-white/80 px-3 py-2">
                     <p className="text-[10px] text-slate-500">التوقيت</p>
                     <p className="mt-1 text-sm text-slate-900">
-                      {formatTime(order.created_at)}
+                      {formatTime((order as DeclinedOrder).declined_at ?? order.created_at)}
                     </p>
                   </div>
                   <div className="rounded-xl border border-white/70 bg-white/80 px-3 py-2">
