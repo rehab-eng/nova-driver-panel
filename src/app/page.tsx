@@ -110,6 +110,15 @@ function formatTime(value?: string | null): string {
   return date.toLocaleTimeString("ar", { hour: "2-digit", minute: "2-digit" });
 }
 
+function formatOrderNumber(id: string): string {
+  const clean = id.replace(/-/g, "");
+  if (!clean) return "-";
+  const tail = clean.slice(-8);
+  const numeric = Number.parseInt(tail, 16);
+  if (Number.isNaN(numeric)) return clean.slice(0, 6).toUpperCase();
+  return String(numeric % 1_000_000).padStart(6, "0");
+}
+
 const canUseWebAuthn = () =>
   typeof window !== "undefined" &&
   window.isSecureContext &&
@@ -298,7 +307,7 @@ export default function DriverPanel() {
       for (const order of nextOrders) {
         const previous = prevMap.get(order.id);
         if (!previous) {
-          toast.success(`طلب جديد ${order.id.slice(0, 6)}...`);
+          toast.success(`طلب جديد #${formatOrderNumber(order.id)}`);
           flashOrder(order.id);
         } else if (previous.status !== order.status) {
           toast(`تم تحديث حالة الطلب إلى ${formatStatus(order.status)}`, {
