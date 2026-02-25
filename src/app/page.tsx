@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Toaster, toast } from "react-hot-toast";
 import { clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
@@ -42,6 +42,22 @@ type DeclinedOrder = Order & {
   status: "declined";
 };
 
+type StoreTrackSession = {
+  id: string;
+  name: string | null;
+  store_code: string | null;
+};
+
+type StoreTrackOrder = {
+  id: string;
+  status: string | null;
+  created_at?: string | null;
+  delivered_at?: string | null;
+  customer_name?: string | null;
+  receiver_name?: string | null;
+  order_type?: string | null;
+};
+
 type WalletTx = {
   id: string;
   amount: number;
@@ -79,6 +95,23 @@ const statusLabels: Record<string, string> = {
 function formatStatus(value: string | null | undefined): string {
   if (!value) return "-";
   return statusLabels[value] ?? value;
+}
+
+function formatStoreStatus(value: string | null | undefined): string {
+  if (!value) return "-";
+  if (value === "pending") return "قيد التجهيز";
+  if (value === "accepted" || value === "delivering") return "قيد التوصيل";
+  if (value === "delivered") return "تم التوصيل";
+  if (value === "cancelled") return "راجع";
+  return value;
+}
+
+function storeStatusStyle(value: string | null | undefined): string {
+  if (value === "delivered") return statusStyles.delivered;
+  if (value === "cancelled") return statusStyles.cancelled;
+  if (value === "accepted" || value === "delivering") return statusStyles.delivering;
+  if (value === "pending") return statusStyles.pending;
+  return "bg-slate-100 text-slate-600 border-slate-200";
 }
 
 const driverStatusLabels: Record<string, string> = {
@@ -162,6 +195,12 @@ export default function DriverPanel() {
   const [phone, setPhone] = useState("");
   const [secretCode, setSecretCode] = useState("");
   const [driver, setDriver] = useState<Driver | null>(null);
+  const [loginMode, setLoginMode] = useState<"driver" | "store">("driver");
+  const [storeTrackCode, setStoreTrackCode] = useState("");
+  const [storeTrackName, setStoreTrackName] = useState("");
+  const [storeTrack, setStoreTrack] = useState<StoreTrackSession | null>(null);
+  const [storeOrders, setStoreOrders] = useState<StoreTrackOrder[]>([]);
+  const [storeLoading, setStoreLoading] = useState(false);
   const [orders, setOrders] = useState<Order[]>([]);
   const [transactions, setTransactions] = useState<WalletTx[]>([]);
   const [flashIds, setFlashIds] = useState<Set<string>>(new Set());
@@ -186,6 +225,7 @@ export default function DriverPanel() {
     const storedDriver = localStorage.getItem("nova.driver");
     const storedCode = localStorage.getItem("nova.driver_code");
     const storedPhone = localStorage.getItem("nova.driver_phone");
+    const storedStore = localStorage.getItem("nova.store_track");
     if (storedCode) setSecretCode(storedCode);
     if (storedPhone) setPhone(storedPhone);
     if (storedDriver) {
@@ -197,6 +237,18 @@ export default function DriverPanel() {
         localStorage.removeItem("nova.driver");
       }
     }
+    if (storedStore) {
+      try {
+        const parsed = JSON.parse(storedStore) as StoreTrackSession;
+        if (parsed?.id) {
+          setStoreTrack(parsed);
+          setStoreTrackCode(parsed.store_code ?? "");
+          setStoreTrackName(parsed.name ?? "");
+        }
+      } catch {
+        localStorage.removeItem("nova.store_track");
+      }
+    }
   }, []);
 
 
@@ -205,8 +257,17 @@ export default function DriverPanel() {
   }, [driver]);
 
   useEffect(() => {
+    if (storeTrack) {
+      localStorage.setItem("nova.store_track", JSON.stringify(storeTrack));
+    } else {
+      localStorage.removeItem("nova.store_track");
+    }
+  }, [storeTrack]);
+
+  useEffect(() => {
     if (driver?.status) lastDriverStatusRef.current = driver.status;
   }, [driver?.status]);
+
 
   useEffect(() => {
     if (!driver?.id) return;
@@ -272,6 +333,81 @@ export default function DriverPanel() {
   useEffect(() => {
     localStorage.setItem("nova.driver_code", secretCode);
   }, [secretCode]);
+
+  const fetchStoreOrders = useCallback(
+    async (silent = false) => {
+      if (!storeTrack?.store_code || !storeTrack?.name) return;
+      if (!silent) setStoreLoading(true);
+      try {
+        const res = await fetch(
+          `${API_BASE}/stores/track?store_code=${encodeURIComponent(
+            storeTrack.store_code
+          )}&store_name=${encodeURIComponent(storeTrack.name ?? "")}`
+        );
+        const data = (await res.json()) as { ok?: boolean; orders?: StoreTrackOrder[]; store?: StoreTrackSession; error?: string };
+        if (data?.ok && Array.isArray(data.orders)) {
+          setStoreOrders(data.orders);
+          if (data.store) setStoreTrack(data.store);
+        } else if (!silent) {
+          toast.error(data?.error ?? "تعذر جلب الطلبات");
+        }
+      } catch {
+        if (!silent) toast.error("خطأ في الشبكة");
+      } finally {
+        if (!silent) setStoreLoading(false);
+      }
+    },
+    [storeTrack?.store_code, storeTrack?.name]
+  );
+
+  const loginStore = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!storeTrackCode.trim() || !storeTrackName.trim()) {
+      toast.error("اسم المتجر وكود المتجر مطلوبان");
+      return;
+    }
+    setStoreLoading(true);
+    try {
+      const res = await fetch(
+        `${API_BASE}/stores/track?store_code=${encodeURIComponent(
+          storeTrackCode.trim()
+        )}&store_name=${encodeURIComponent(storeTrackName.trim())}`
+      );
+      const data = (await res.json()) as {
+        ok?: boolean;
+        store?: StoreTrackSession;
+        orders?: StoreTrackOrder[];
+        error?: string;
+      };
+      if (data?.ok && data.store) {
+        setStoreTrack(data.store);
+        setStoreOrders(Array.isArray(data.orders) ? data.orders : []);
+        toast.success("تم فتح لوحة متابعة المتجر");
+      } else {
+        toast.error(data?.error ?? "تعذر تسجيل الدخول");
+      }
+    } catch {
+      toast.error("خطأ في الشبكة");
+    } finally {
+      setStoreLoading(false);
+    }
+  };
+
+  const logoutStore = () => {
+    setStoreTrack(null);
+    setStoreOrders([]);
+    setStoreTrackCode("");
+    setStoreTrackName("");
+  };
+
+  useEffect(() => {
+    if (!storeTrack) return;
+    fetchStoreOrders(true);
+    const timer = window.setInterval(() => {
+      fetchStoreOrders(true);
+    }, 8000);
+    return () => window.clearInterval(timer);
+  }, [storeTrack, fetchStoreOrders]);
 
   const setOrderBusy = (orderId: string, busy: boolean) => {
     setOrderActionIds((prev) => {
@@ -831,6 +967,144 @@ export default function DriverPanel() {
   const walletBalance =
     typeof driver?.wallet_balance === "number" ? driver.wallet_balance : 0;
 
+  const storeOrdersSorted = useMemo(() => {
+    return [...storeOrders].sort((a, b) => {
+      const ta = a.created_at ? new Date(a.created_at).getTime() : 0;
+      const tb = b.created_at ? new Date(b.created_at).getTime() : 0;
+      return tb - ta;
+    });
+  }, [storeOrders]);
+
+  const storeStats = useMemo(() => {
+    const preparing = storeOrders.filter((o) => o.status === "pending").length;
+    const delivering = storeOrders.filter(
+      (o) => o.status === "accepted" || o.status === "delivering"
+    ).length;
+    const delivered = storeOrders.filter((o) => o.status === "delivered").length;
+    const returned = storeOrders.filter((o) => o.status === "cancelled").length;
+    return { preparing, delivering, delivered, returned };
+  }, [storeOrders]);
+
+  if (!driver && storeTrack) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-sky-100 via-cyan-50 to-orange-100 text-slate-900">
+        <Toaster position="top-center" />
+        <div className="mx-auto w-full max-w-4xl px-5 py-10">
+          <header className="rounded-[28px] border border-white/70 bg-white/80 p-6 shadow-[0_24px_60px_-36px_rgba(0,0,0,0.35)] backdrop-blur-2xl">
+            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+              <div className="flex items-center gap-3">
+                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white">
+                  <img
+                    src="/logo.webp"
+                    alt="Nova"
+                    className="h-12 w-12 rounded-2xl border border-white/70 bg-white/80"
+                  />
+                </div>
+                <div className="text-right">
+                  <p className="text-xs tracking-[0.25em] text-slate-500">
+                    NOVA MAX
+                  </p>
+                  <p className="text-lg font-semibold text-slate-900">
+                    متابعة المتجر
+                  </p>
+                  <p className="text-xs text-slate-500">
+                    {storeTrack.name ?? "متجر"} • {storeTrack.store_code ?? "-"}
+                  </p>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => fetchStoreOrders(false)}
+                  className="h-10 rounded-full border border-white/70 bg-white/80 px-4 text-xs font-semibold text-slate-700"
+                >
+                  {storeLoading ? "جاري التحديث..." : "تحديث الآن"}
+                </button>
+                <button
+                  type="button"
+                  onClick={logoutStore}
+                  className="h-10 rounded-full border border-rose-200 bg-rose-50 px-4 text-xs font-semibold text-rose-700"
+                >
+                  تسجيل خروج المتجر
+                </button>
+              </div>
+            </div>
+          </header>
+
+          <div className="mt-5 grid gap-3 md:grid-cols-4">
+            <div className="rounded-2xl border border-white/70 bg-white/80 px-4 py-3 text-center text-xs">
+              <p className="text-slate-500">قيد التجهيز</p>
+              <p className="mt-1 text-lg font-semibold text-slate-900">
+                {storeStats.preparing}
+              </p>
+            </div>
+            <div className="rounded-2xl border border-white/70 bg-white/80 px-4 py-3 text-center text-xs">
+              <p className="text-slate-500">قيد التوصيل</p>
+              <p className="mt-1 text-lg font-semibold text-slate-900">
+                {storeStats.delivering}
+              </p>
+            </div>
+            <div className="rounded-2xl border border-white/70 bg-white/80 px-4 py-3 text-center text-xs">
+              <p className="text-slate-500">تم التوصيل</p>
+              <p className="mt-1 text-lg font-semibold text-slate-900">
+                {storeStats.delivered}
+              </p>
+            </div>
+            <div className="rounded-2xl border border-white/70 bg-white/80 px-4 py-3 text-center text-xs">
+              <p className="text-slate-500">راجع</p>
+              <p className="mt-1 text-lg font-semibold text-slate-900">
+                {storeStats.returned}
+              </p>
+            </div>
+          </div>
+
+          <section className="mt-6 rounded-[28px] border border-white/70 bg-white/80 p-6 shadow-[0_24px_60px_-36px_rgba(0,0,0,0.35)] backdrop-blur-2xl">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold">قائمة الطلبات</h2>
+              <span className="text-xs text-slate-500">
+                {storeOrdersSorted.length} طلب
+              </span>
+            </div>
+            <div className="mt-4 space-y-3">
+              {storeOrdersSorted.length === 0 && (
+                <div className="rounded-2xl border border-white/70 bg-white/80 px-4 py-6 text-center text-sm text-slate-500">
+                  لا توجد طلبات حالياً لهذا المتجر.
+                </div>
+              )}
+              {storeOrdersSorted.map((order) => (
+                <div
+                  key={`store-${order.id}`}
+                  className="flex flex-col gap-3 rounded-2xl border border-white/70 bg-white/80 px-4 py-3 md:flex-row md:items-center md:justify-between"
+                >
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900">
+                      طلب #{formatOrderNumber(order.id)}
+                    </p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      {order.order_type ?? order.receiver_name ?? order.customer_name ?? "-"}
+                    </p>
+                  </div>
+                  <div className="text-left">
+                    <span
+                      className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold ${storeStatusStyle(
+                        order.status
+                      )}`}
+                    >
+                      {formatStoreStatus(order.status)}
+                    </span>
+                    <p className="mt-1 text-xs text-slate-500">
+                      {formatTime(order.created_at ?? "")}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        </div>
+      </div>
+    );
+  }
+
   if (!driver) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-sky-100 via-cyan-50 to-orange-100 text-slate-900">
@@ -848,7 +1122,9 @@ export default function DriverPanel() {
                 </div>
                 <div className="text-right">
                   <p className="text-xs tracking-[0.25em] text-slate-500">Nova Max</p>
-                  <p className="text-sm font-semibold text-slate-900">واجهة المندوب</p>
+                  <p className="text-sm font-semibold text-slate-900">
+                    بوابة المتجر والمندوب
+                  </p>
                 </div>
               </div>
               <span className="rounded-full border border-orange-200 bg-orange-50 px-3 py-1 text-xs font-semibold text-orange-700">
@@ -856,30 +1132,79 @@ export default function DriverPanel() {
               </span>
             </div>
 
+            <div className="mt-5 flex gap-2">
+              <button
+                type="button"
+                onClick={() => setLoginMode("driver")}
+                className={`flex-1 rounded-full border px-3 py-2 text-xs font-semibold ${
+                  loginMode === "driver"
+                    ? "border-orange-200 bg-orange-50 text-orange-700"
+                    : "border-white/70 bg-white/80 text-slate-600"
+                }`}
+              >
+                مندوب
+              </button>
+              <button
+                type="button"
+                onClick={() => setLoginMode("store")}
+                className={`flex-1 rounded-full border px-3 py-2 text-xs font-semibold ${
+                  loginMode === "store"
+                    ? "border-sky-200 bg-sky-50 text-sky-700"
+                    : "border-white/70 bg-white/80 text-slate-600"
+                }`}
+              >
+                متجر
+              </button>
+            </div>
+
             <div className="mt-6 text-right">
-              <h1 className="text-2xl font-semibold">تسجيل دخول المندوب</h1>
+              <h1 className="text-2xl font-semibold">
+                {loginMode === "driver" ? "تسجيل دخول المندوب" : "متابعة المتجر"}
+              </h1>
               <p className="mt-2 text-sm text-slate-500">
-                أدخل رقم الهاتف وكود السائق من لوحة المتجر.
+                {loginMode === "driver"
+                  ? "أدخل رقم الهاتف وكود السائق من لوحة المتجر."
+                  : "أدخل اسم المتجر وكود المتجر لمتابعة حالات الطلبات."}
               </p>
             </div>
 
-            <form onSubmit={login} className="mt-6 grid w-full gap-4">
-              <input
-                className="h-14 rounded-2xl border border-white/70 bg-white/80 px-4 text-base text-slate-900 outline-none focus:border-orange-500/80"
-                placeholder="رقم الهاتف"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-              />
-              <input
-                className="h-14 rounded-2xl border border-white/70 bg-white/80 px-4 text-base text-slate-900 outline-none focus:border-orange-500/80"
-                placeholder="كود السائق"
-                value={secretCode}
-                onChange={(e) => setSecretCode(e.target.value)}
-              />
-              <button className="h-14 rounded-2xl bg-gradient-to-l from-orange-500 to-amber-400 text-base font-semibold text-white shadow-lg shadow-orange-500/30 transition hover:translate-y-[-1px]">
-                دخول لوحة السائق
-              </button>
-            </form>
+            {loginMode === "driver" ? (
+              <form onSubmit={login} className="mt-6 grid w-full gap-4">
+                <input
+                  className="h-14 rounded-2xl border border-white/70 bg-white/80 px-4 text-base text-slate-900 outline-none focus:border-orange-500/80"
+                  placeholder="رقم الهاتف"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                />
+                <input
+                  className="h-14 rounded-2xl border border-white/70 bg-white/80 px-4 text-base text-slate-900 outline-none focus:border-orange-500/80"
+                  placeholder="كود السائق"
+                  value={secretCode}
+                  onChange={(e) => setSecretCode(e.target.value)}
+                />
+                <button className="h-14 rounded-2xl bg-gradient-to-l from-orange-500 to-amber-400 text-base font-semibold text-white shadow-lg shadow-orange-500/30 transition hover:translate-y-[-1px]">
+                  دخول لوحة السائق
+                </button>
+              </form>
+            ) : (
+              <form onSubmit={loginStore} className="mt-6 grid w-full gap-4">
+                <input
+                  className="h-14 rounded-2xl border border-white/70 bg-white/80 px-4 text-base text-slate-900 outline-none focus:border-sky-400/80"
+                  placeholder="اسم المتجر"
+                  value={storeTrackName}
+                  onChange={(e) => setStoreTrackName(e.target.value)}
+                />
+                <input
+                  className="h-14 rounded-2xl border border-white/70 bg-white/80 px-4 text-base text-slate-900 outline-none focus:border-sky-400/80"
+                  placeholder="كود المتجر"
+                  value={storeTrackCode}
+                  onChange={(e) => setStoreTrackCode(e.target.value)}
+                />
+                <button className="h-14 rounded-2xl bg-gradient-to-l from-sky-500 to-cyan-400 text-base font-semibold text-white shadow-lg shadow-sky-500/30 transition hover:translate-y-[-1px]">
+                  دخول لوحة المتجر
+                </button>
+              </form>
+            )}
             <p className="mt-4 text-xs text-slate-500">
               البيانات تُحمّل مباشرة بعد تسجيل الدخول.
             </p>
