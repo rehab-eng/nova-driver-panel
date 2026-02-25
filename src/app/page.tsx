@@ -1064,17 +1064,17 @@ export default function DriverPanel() {
 
   if (!driver && storeTrack) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-sky-100 via-cyan-50 to-orange-100 text-slate-900">
+      <div className="min-h-screen bg-gradient-to-br from-sky-50 via-white to-orange-50 text-slate-900">
         <Toaster position="top-center" />
         <div className="mx-auto w-full max-w-4xl px-5 py-10">
-          <header className="rounded-[28px] border border-white/70 bg-white/80 p-6 shadow-[0_24px_60px_-36px_rgba(0,0,0,0.35)] backdrop-blur-2xl">
+          <header className="rounded-[28px] border border-sky-100/80 bg-white/90 p-6 shadow-[0_24px_60px_-36px_rgba(14,116,144,0.35)] backdrop-blur-2xl">
             <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
               <div className="flex items-center gap-3">
-                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white">
+                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white shadow-sm">
                   <img
                     src="/logo.webp"
                     alt="Nova"
-                    className="h-12 w-12 rounded-2xl border border-white/70 bg-white/80"
+                    className="h-12 w-12 rounded-2xl border border-sky-100 bg-white"
                   />
                 </div>
                 <div className="text-right">
@@ -1093,14 +1093,14 @@ export default function DriverPanel() {
                 <button
                   type="button"
                   onClick={() => fetchStoreOrders(false)}
-                  className="h-10 rounded-full border border-white/70 bg-white/80 px-4 text-xs font-semibold text-slate-700"
+                  className="h-10 rounded-full border border-sky-100 bg-sky-50 px-4 text-xs font-semibold text-sky-700"
                 >
                   {storeLoading ? "جاري التحديث..." : "تحديث الآن"}
                 </button>
                 <button
                   type="button"
                   onClick={logoutStore}
-                  className="h-10 rounded-full border border-rose-200 bg-rose-50 px-4 text-xs font-semibold text-rose-700"
+                  className="h-10 rounded-full border border-orange-200 bg-orange-50 px-4 text-xs font-semibold text-orange-700"
                 >
                   تسجيل خروج المتجر
                 </button>
@@ -1109,25 +1109,25 @@ export default function DriverPanel() {
           </header>
 
           <div className="mt-5 grid gap-3 md:grid-cols-4">
-            <div className="rounded-2xl border border-white/70 bg-white/80 px-4 py-3 text-center text-xs">
+            <div className="rounded-2xl border border-sky-100/80 bg-white/90 px-4 py-3 text-center text-xs">
               <p className="text-slate-500">قيد التجهيز</p>
               <p className="mt-1 text-lg font-semibold text-slate-900">
                 {storeStats.preparing}
               </p>
             </div>
-            <div className="rounded-2xl border border-white/70 bg-white/80 px-4 py-3 text-center text-xs">
+            <div className="rounded-2xl border border-sky-100/80 bg-white/90 px-4 py-3 text-center text-xs">
               <p className="text-slate-500">قيد التوصيل</p>
               <p className="mt-1 text-lg font-semibold text-slate-900">
                 {storeStats.delivering}
               </p>
             </div>
-            <div className="rounded-2xl border border-white/70 bg-white/80 px-4 py-3 text-center text-xs">
+            <div className="rounded-2xl border border-sky-100/80 bg-white/90 px-4 py-3 text-center text-xs">
               <p className="text-slate-500">تم التوصيل</p>
               <p className="mt-1 text-lg font-semibold text-slate-900">
                 {storeStats.delivered}
               </p>
             </div>
-            <div className="rounded-2xl border border-white/70 bg-white/80 px-4 py-3 text-center text-xs">
+            <div className="rounded-2xl border border-sky-100/80 bg-white/90 px-4 py-3 text-center text-xs">
               <p className="text-slate-500">راجع</p>
               <p className="mt-1 text-lg font-semibold text-slate-900">
                 {storeStats.returned}
@@ -1135,7 +1135,7 @@ export default function DriverPanel() {
             </div>
           </div>
 
-          <section className="mt-6 rounded-[28px] border border-white/70 bg-white/80 p-6 shadow-[0_24px_60px_-36px_rgba(0,0,0,0.35)] backdrop-blur-2xl">
+          <section className="mt-6 rounded-[28px] border border-sky-100/80 bg-white/90 p-6 shadow-[0_24px_60px_-36px_rgba(14,116,144,0.35)] backdrop-blur-2xl">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold">قائمة الطلبات</h2>
               <span className="text-xs text-slate-500">
@@ -1144,14 +1144,14 @@ export default function DriverPanel() {
             </div>
             <div className="mt-4 space-y-3">
               {storeOrdersSorted.length === 0 && (
-                <div className="rounded-2xl border border-white/70 bg-white/80 px-4 py-6 text-center text-sm text-slate-500">
+                <div className="rounded-2xl border border-sky-100/80 bg-white/90 px-4 py-6 text-center text-sm text-slate-500">
                   لا توجد طلبات حالياً لهذا المتجر.
                 </div>
               )}
               {storeOrdersSorted.map((order) => (
                 <div
                   key={`store-${order.id}`}
-                  className="flex flex-col gap-3 rounded-2xl border border-white/70 bg-white/80 px-4 py-3 md:flex-row md:items-center md:justify-between"
+                  className="flex flex-col gap-3 rounded-2xl border border-sky-100/80 bg-white/90 px-4 py-3 md:flex-row md:items-center md:justify-between"
                 >
                   <div>
                     <p className="text-sm font-semibold text-slate-900">
