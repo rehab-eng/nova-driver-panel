@@ -401,13 +401,87 @@ export default function DriverPanel() {
   };
 
   useEffect(() => {
-    if (!storeTrack) return;
-    fetchStoreOrders(true);
-    const timer = window.setInterval(() => {
-      fetchStoreOrders(true);
-    }, 8000);
-    return () => window.clearInterval(timer);
-  }, [storeTrack, fetchStoreOrders]);
+    if (!storeTrack?.store_code || !storeTrack?.name) return;
+    let active = true;
+    let socket: WebSocket | null = null;
+    let retry = 0;
+    let reconnectTimer: number | null = null;
+
+    const upsertStoreOrder = (incoming: StoreTrackOrder) => {
+      setStoreOrders((prev) => {
+        const idx = prev.findIndex((order) => order.id === incoming.id);
+        if (idx >= 0) {
+          const next = [...prev];
+          next[idx] = { ...next[idx], ...incoming };
+          return next;
+        }
+        return [incoming, ...prev];
+      });
+    };
+
+    const handleStoreEvent = (payload: Record<string, unknown>) => {
+      const type = payload.type;
+      if (payload.store_id && typeof payload.store_id === "string") {
+        if (storeTrack?.id && payload.store_id !== storeTrack.id) return;
+      }
+      if (type === "order_created" && payload.order && typeof payload.order === "object") {
+        const order = payload.order as StoreTrackOrder;
+        upsertStoreOrder(order);
+        return;
+      }
+      if (type === "order_status" && typeof payload.order_id === "string") {
+        upsertStoreOrder({
+          id: payload.order_id,
+          status: typeof payload.status === "string" ? payload.status : null,
+          delivered_at:
+            typeof payload.delivered_at === "string" ? payload.delivered_at : null,
+        });
+      }
+    };
+
+    const startSocket = () => {
+      const wsUrl = buildWsUrl("/realtime", {
+        role: "store",
+        store_code: storeTrack.store_code ?? "",
+        store_name: storeTrack.name ?? "",
+      });
+      socket = new WebSocket(wsUrl);
+
+      socket.onopen = () => {
+        retry = 0;
+        fetchStoreOrders(true);
+      };
+
+      socket.onmessage = (event) => {
+        if (!active) return;
+        try {
+          const payload = JSON.parse(event.data) as Record<string, unknown>;
+          handleStoreEvent(payload);
+        } catch {
+          // ignore
+        }
+      };
+
+      socket.onerror = () => {
+        socket?.close();
+      };
+
+      socket.onclose = () => {
+        if (!active) return;
+        const delay = Math.min(30000, 1000 * 2 ** retry);
+        retry += 1;
+        reconnectTimer = window.setTimeout(startSocket, delay);
+      };
+    };
+
+    startSocket();
+
+    return () => {
+      active = false;
+      socket?.close();
+      if (reconnectTimer) window.clearTimeout(reconnectTimer);
+    };
+  }, [storeTrack?.store_code, storeTrack?.name, storeTrack?.id, fetchStoreOrders]);
 
   const setOrderBusy = (orderId: string, busy: boolean) => {
     setOrderActionIds((prev) => {
@@ -803,9 +877,12 @@ export default function DriverPanel() {
       const data = await res.json();
       if (data?.driver?.id) {
         setDriver(data.driver);
+        setStoreTrack(null);
+        setStoreOrders([]);
+        setLoginMode("driver");
         toast.success("مرحباً بعودتك", { id: toastId });
       } else {
-        toast.error("رقم الهاتف وكود السائق مطلوبان");
+        toast.error(data?.error ?? "فشل تسجيل الدخول", { id: toastId });
       }
     } catch {
       toast.error("خطأ في الشبكة", { id: toastId });
