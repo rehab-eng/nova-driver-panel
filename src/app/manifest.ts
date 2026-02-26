@@ -4,9 +4,9 @@ export const dynamic = "force-static";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Nova Max Driver",
-    short_name: "Nova Driver",
-    description: "Driver app for Nova Max Logistics.",
+    name: "Nova Max",
+    short_name: "Nova Max",
+    description: "Nova Max driver app.",
     start_url: "/",
     display: "standalone",
     background_color: "#f8fafc",
