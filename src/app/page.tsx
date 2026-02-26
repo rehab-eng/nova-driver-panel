@@ -855,6 +855,9 @@ export default function DriverPanel() {
       if (type === "order_status" && typeof payload.order_id === "string") {
         if (!shouldApplyOrderEvent(payload.order_id, (payload as { ts?: unknown }).ts))
           return;
+        const existing = ordersRef.current.find(
+          (order) => order.id === payload.order_id
+        );
         upsertOrder(
           {
             id: payload.order_id,
@@ -880,6 +883,9 @@ export default function DriverPanel() {
           },
           true
         );
+        if (!existing || !existing.customer_location_text) {
+          safeFetchOrders(false);
+        }
         if (typeof payload.status === "string") {
           pushNotification(
             "تحديث حالة الطلب",
