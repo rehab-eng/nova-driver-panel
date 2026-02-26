@@ -246,6 +246,7 @@ export default function DriverPanel() {
   const [loginMode, setLoginMode] = useState<"driver" | "store">("driver");
   const [storeTrackId, setStoreTrackId] = useState("");
   const [storeTrackName, setStoreTrackName] = useState("");
+  const [storeTrackCode, setStoreTrackCode] = useState("");
   const [storeTrack, setStoreTrack] = useState<StoreTrackSession | null>(null);
   const [storeOrders, setStoreOrders] = useState<StoreTrackOrder[]>([]);
   const [storeLoading, setStoreLoading] = useState(false);
@@ -302,6 +303,7 @@ export default function DriverPanel() {
           setStoreTrack(parsed);
           setStoreTrackId(parsed.id ?? "");
           setStoreTrackName(parsed.name ?? "");
+          if (parsed.store_code) setStoreTrackCode(parsed.store_code ?? "");
         }
       } catch {
         localStorage.removeItem("nova.store_track");
@@ -317,6 +319,7 @@ export default function DriverPanel() {
   useEffect(() => {
     if (storeTrack) {
       localStorage.setItem("nova.store_track", JSON.stringify(storeTrack));
+      if (storeTrack.store_code) setStoreTrackCode(storeTrack.store_code ?? "");
     } else {
       localStorage.removeItem("nova.store_track");
     }
@@ -397,10 +400,11 @@ export default function DriverPanel() {
       if (!storeTrack?.id) return;
       if (!silent) setStoreLoading(true);
       try {
+        const code = storeTrack.store_code ?? storeTrackCode;
         const res = await fetch(
           `${API_BASE}/stores/track?store_id=${encodeURIComponent(
             storeTrack.id
-          )}`
+          )}&store_code=${encodeURIComponent(code ?? "")}`
         );
         const data = (await res.json()) as { ok?: boolean; orders?: StoreTrackOrder[]; store?: StoreTrackSession; error?: string };
       if (data?.ok && Array.isArray(data.orders)) {
@@ -419,7 +423,7 @@ export default function DriverPanel() {
       if (!silent) setStoreLoading(false);
     }
   },
-    [storeTrack?.id]
+    [storeTrack?.id, storeTrackCode]
   );
 
   const fetchPublicStores = useCallback(async () => {
@@ -449,12 +453,16 @@ export default function DriverPanel() {
       toast.error("اختر المتجر أولاً");
       return;
     }
+    if (!storeTrackCode.trim() || storeTrackCode.trim().length < 4) {
+      toast.error("أدخل الكود السري للمتجر");
+      return;
+    }
     setStoreLoading(true);
     try {
       const res = await fetch(
         `${API_BASE}/stores/track?store_id=${encodeURIComponent(
           storeTrackId.trim()
-        )}`
+        )}&store_code=${encodeURIComponent(storeTrackCode.trim())}`
       );
       const data = (await res.json()) as {
         ok?: boolean;
@@ -465,6 +473,7 @@ export default function DriverPanel() {
       if (data?.ok && data.store) {
         setStoreTrack(data.store);
         setStoreTrackName(data.store.name ?? "");
+        setStoreTrackCode(data.store.store_code ?? storeTrackCode.trim());
         setStoreOrders(Array.isArray(data.orders) ? data.orders : []);
         setStoreLastSync(new Date().toISOString());
         toast.success("تم فتح لوحة متابعة المتجر");
@@ -483,6 +492,7 @@ export default function DriverPanel() {
     setStoreOrders([]);
     setStoreTrackId("");
     setStoreTrackName("");
+    setStoreTrackCode("");
   };
 
   useEffect(() => {
@@ -534,6 +544,7 @@ export default function DriverPanel() {
       const wsUrl = buildWsUrl("/realtime", {
         role: "store",
         store_id: storeTrack.id ?? "",
+        store_code: storeTrack.store_code ?? storeTrackCode ?? "",
       });
       socket = new WebSocket(wsUrl);
 
@@ -1616,6 +1627,15 @@ export default function DriverPanel() {
                     </option>
                   ))}
                 </select>
+                <label className="text-xs font-semibold text-slate-500">
+                  الكود السري للمتجر
+                </label>
+                <input
+                  className="h-14 rounded-2xl border border-white/70 bg-white/90 px-4 text-base text-slate-900 outline-none focus:border-sky-400/80"
+                  placeholder="ادخل الرمز السري للمتجر"
+                  value={storeTrackCode}
+                  onChange={(e) => setStoreTrackCode(e.target.value)}
+                />
                 {publicStoresLoading && (
                   <p className="text-xs text-slate-500">جاري تحميل المتاجر...</p>
                 )}
