@@ -1588,7 +1588,7 @@ export default function DriverPanel() {
                 <label className="text-xs font-semibold text-slate-500">كود السائق</label>
                 <input
                   className="h-14 rounded-2xl border border-white/70 bg-white/90 px-4 text-base text-slate-900 outline-none focus:border-orange-500/80"
-                  placeholder="ادخل الكود هنا"
+                  placeholder="ادخل الرمز السري"
                   value={secretCode}
                   onChange={(e) => setSecretCode(e.target.value)}
                 />
