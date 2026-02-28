@@ -4,19 +4,19 @@ import "./globals.css";
 export const metadata: Metadata = {
   metadataBase: new URL("https://app.novamax.ly"),
   title: {
-    default: "Nova Max | لوحة تحكم المندوب",
+    default: "Nova Max | لوحة دخول المندوبين والمتاجر",
     template: "%s | Nova Max",
   },
-  description: "لوحة تحكم المندوبين لمنظومة Nova Max اللوجستية.",
+  description: "بوابة الدخول الرسمية للمندوبين والمتاجر في منظومة Nova Max.",
   applicationName: "Nova Max",
-  keywords: ['Nova Max', 'Nova', 'لوحة تحكم المندوب', 'Delivery', 'Logistics'],
+  keywords: ['Nova Max', 'Nova', 'لوحة دخول المندوبين والمتاجر', 'Delivery', 'Logistics'],
   robots: {
     index: false,
     follow: false,
   },
   openGraph: {
-    title: "Nova Max | لوحة تحكم المندوب",
-    description: "لوحة تحكم المندوبين لمنظومة Nova Max اللوجستية.",
+    title: "Nova Max | لوحة دخول المندوبين والمتاجر",
+    description: "بوابة الدخول الرسمية للمندوبين والمتاجر في منظومة Nova Max.",
     type: "website",
     locale: "ar_LY",
     images: [
@@ -30,8 +30,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Nova Max | لوحة تحكم المندوب",
-    description: "لوحة تحكم المندوبين لمنظومة Nova Max اللوجستية.",
+    title: "Nova Max | لوحة دخول المندوبين والمتاجر",
+    description: "بوابة الدخول الرسمية للمندوبين والمتاجر في منظومة Nova Max.",
     images: ["/logo.png"],
   },
   manifest: "/manifest.webmanifest",
