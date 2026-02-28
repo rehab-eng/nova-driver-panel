@@ -1546,7 +1546,7 @@ export default function DriverPanel() {
               <div className="text-right">
                 <p className="text-[11px] tracking-[0.35em] text-slate-400">NOVA MAX</p>
                 <p className="text-sm font-semibold text-slate-900">
-                  بوابة المندوب والمتجر
+                  {loginMode === "driver" ? "لوحة تحكم المندوب" : "لوحة تحكم المتجر"}
                 </p>
                 <p className="mt-1 text-xs text-slate-500">
                   دخول آمن وسريع للمتابعة الفورية.
@@ -1583,7 +1583,7 @@ export default function DriverPanel() {
 
             <div className="mt-6 text-right">
               <h1 className="text-2xl font-semibold">
-                {loginMode === "driver" ? "تسجيل دخول المندوب" : "متابعة المتجر"}
+                {loginMode === "driver" ? "لوحة تحكم المندوب" : "لوحة تحكم المتجر"}
               </h1>
               <p className="mt-2 text-sm text-slate-500">
                 {loginMode === "driver"
@@ -1610,7 +1610,7 @@ export default function DriverPanel() {
                   onChange={(e) => setSecretCode(e.target.value)}
                 />
                 <button className="mt-2 h-14 rounded-2xl bg-gradient-to-l from-orange-500 to-amber-400 text-base font-semibold text-white shadow-lg shadow-orange-500/30 transition hover:translate-y-[-1px]">
-                  دخول لوحة السائق
+                  دخول لوحة تحكم المندوب
                 </button>
               </form>
             ) : (
